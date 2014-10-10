@@ -87,6 +87,7 @@ end
 load_last()
 --get list of files in scripts folder
 local function load_filenames()
+    filenames = {}
     local function searchRecursive(directory)
         local dirlist = fs.list(directory)
         if not dirlist then return end
@@ -185,15 +186,34 @@ newscroll = function(text,x,y,vis,r,g,b)
     txt.visible=vis
     txt.length=string.len(text)
     txt.start=1
-    local last=2
-    while tpt.textwidth(text:sub(1,last))<vis and last<=txt.length do
-        last=last+1
-    end
-    txt.last=last-1
-    txt.minlast=last-1
-    txt.ppl=((txt.visible-6)/(txt.length-txt.minlast+1))
     txt.drawlist={} --reset draw
+    txt.timer=socket.gettime()+3
+    function txt:cuttext(self)
+        local last = self.start+1
+        while tpt.textwidth(self.text:sub(self.start,last))<txt.visible and last<=self.length do
+            last = last+1
+        end
+        self.last=last-1
+    end
+    txt:cuttext(txt)
+    txt.minlast=txt.last-1
+    txt.ppl=((txt.visible-6)/(txt.length-txt.minlast+1))
     txt:drawadd(function(self,x,y)
+        if socket.gettime() > self.timer then
+            if self.last >= self.length then
+                self.start = 1
+                self:cuttext(self)
+                self.timer = socket.gettime()+3
+            else
+                self.start = self.start + 1
+                self:cuttext(self)
+                if self.last >= self.length then
+                    self.timer = socket.gettime()+3
+                else
+                    self.timer = socket.gettime()+.15
+                end
+            end
+        end
         tpt.drawtext(x or self.x,y or self.y, self.text:sub(self.start,self.last) ,self.r,self.g,self.b)
     end)
     function txt:process(mx,my,button,event,wheel)
@@ -206,6 +226,7 @@ newscroll = function(text,x,y,vis,r,g,b)
                     newstart=newstart+1
                 end
                 self.start=newstart self.last=newlast
+                self.timer = socket.gettime()+3
             end
         end
     end
