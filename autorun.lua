@@ -42,7 +42,6 @@ local num_files = 0
 local previous_running = {}
 local requiresrestart=false
 local TPTver = tpt.version
-local filladjust = 0 if TPTver.build <= 253 then filladjust = -2 end
 local hidden_mode=true
 local firstload=true
 local updatecheckID = 'http://www.pastebin.com/raw.php?i=FKxVYV01'
@@ -143,7 +142,7 @@ new = function(x,y,w,h,r,g,b)
     function box:setbackground(r,g,b,a) self.br=r self.bg=g self.bb=b self.ba=a end
     box.drawbox=true
     box.drawbackground=false
-    box:drawadd(function(self) if self.drawbackground then tpt.fillrect(self.x,self.y,self.w+1+filladjust,self.h+1+filladjust,self.br,self.bg,self.bb,self.ba) end
+    box:drawadd(function(self) if self.drawbackground then tpt.fillrect(self.x,self.y,self.w+1,self.h+1,self.br,self.bg,self.bb,self.ba) end
                                 if self.drawbox then tpt.drawrect(self.x,self.y,self.w,self.h,self.r,self.g,self.b) end end)
     box:moveadd(function(self,x,y)
         if x then self.x=self.x+x self.x2=self.x2+x end
@@ -315,8 +314,8 @@ new_button = function(x,y,w,h,splitx,f,text)
     b:drawadd(function(self)
         self.t:draw()
         tpt.drawrect(self.x+3,self.y+1,8,8)
-        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,6,6,80,80,80)
-        elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8+filladjust,8+filladjust) end
+        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,80,80,80)
+        elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8+,8) end
         if self.running then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
@@ -658,7 +657,7 @@ end
 --small button on right to bring up main menu
 local WHITE = {255,255,255,255}
 local BLACK = {0,0,0,255}
-local sidecoords = {612,134,16+filladjust,17+filladjust}
+local sidecoords = {612,134,16,17}
 local ICON = math.random(2) --pick a random icon
 local lua_letters= {{{615,136,615,141},{615,141,617,141},{619,141,619,145},{619,145,621,145},{621,141,621,145},{623,145,625,145},{623,145,623,149},{624,147,624,147},{625,145,625,149},},
     {{615,137,615,147},{615,148,620,148},{617,137,617,146},{617,146,620,146},{620,137,620,146},{622,137,625,137},{622,137,622,148},{623,142,624,142},{625,137,625,148},}}
