@@ -53,7 +53,10 @@ local settings = {}
 math.randomseed(os.time()) math.random() math.random() math.random() --some filler randoms
 --load settings before anything else
 local function load_last()
-    local f = io.open("autorunsettings.txt","r")
+    local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt","r")
+    if not f then
+        f = io.open("autorunsettings.txt","r")
+    end
     if f then
         local lines = {}
         local line = f:read("*l")
@@ -315,7 +318,7 @@ new_button = function(x,y,w,h,splitx,f,text)
         self.t:draw()
         tpt.drawrect(self.x+3,self.y+1,8,8)
         if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,80,80,80)
-        elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8+,8) end
+        elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8,8) end
         if self.running then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
@@ -515,7 +518,12 @@ local function save_last()
 	    savestring = savestring.."\nSET "..k.." "..n..":'"..v.."'"	    
 	end
     end
-    local f = io.open("autorunsettings.txt","w")
+    local f
+    if TPT_LUA_PATH == "scripts" then
+        f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
+    else
+        f = io.open("autorunsettings.txt", "w")
+    end
     if f then
         f:write(savestring)
         f:close()
