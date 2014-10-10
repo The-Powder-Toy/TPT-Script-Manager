@@ -91,7 +91,7 @@ local function load_filenames()
         local dirlist = fs.list(directory)
         if not dirlist then return end
         for i,v in ipairs(dirlist) do
-            file = directory.."/"..v
+            local file = directory.."/"..v
             if fs.isDirectory(file) then
                 searchRecursive(file)
             elseif fs.isFile(file) then
@@ -268,6 +268,7 @@ new = function(x,y,w,h,f,text)
     b.drawbox=false
     b.almostselected=false
     b.invert=true
+    b:setbackground(127,127,127,125)
     b:drawadd(function(self)
         if self.invert and self.almostselected then
             self.almostselected=false
@@ -277,6 +278,11 @@ new = function(x,y,w,h,f,text)
             b.t:draw()
             b.t:setcolor(tr,tg,tb)
         else
+            if tpt.mousex>=self.x and tpt.mousex<=self.x2 and tpt.mousey>=self.y and tpt.mousey<=self.y2 then
+                self.drawbackground=true
+            else
+                self.drawbackground=false
+            end
             b.t:draw()
         end
     end)
@@ -307,7 +313,7 @@ up_button = function(x,y,w,h,f,text,filename)
     return b
 end,
 new_button = function(x,y,w,h,splitx,f,text)
-    local b = ui_box.new(x,y,w,h)
+    local b = ui_box.new(x,y,splitx,h)
     b.f=f
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+16,y+2,splitx-16)
@@ -315,10 +321,16 @@ new_button = function(x,y,w,h,splitx,f,text)
     b.running=false
     b.checkbut=ui_checkbox.up_button(x+splitx+33,y,33,10,ui_button.scriptcheck,"Check",text)
     b.drawbox=false
+    b:setbackground(127,127,127,100)
     b:drawadd(function(self)
+        if tpt.mousex>=self.x and tpt.mousex<=self.x2 and tpt.mousey>=self.y and tpt.mousey<=self.y2 then
+            self.drawbackground=true
+        else
+            self.drawbackground=false
+        end
         self.t:draw()
         tpt.drawrect(self.x+3,self.y+1,8,8)
-        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,80,80,80)
+        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,150,150,150)
         elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8,8) end
         if self.running then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
@@ -647,6 +659,7 @@ local function do_restart()
 end
 --TPT interface
 local function step()
+    tpt.fillrect(0,0,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
     mainwindow:draw()
     tpt.drawtext(280,140,"Console Output:")
     if requiresrestart then
@@ -659,9 +672,13 @@ local function mouseclick(mousex,mousey,button,event,wheel)
     sidebutton:process(mousex,mousey,button,event,wheel)
     if hidden_mode then return true end
    
-    if mousex>612 or mousey>384 then return true end
+    if mousex>612 or mousey>384 then return false end
     mainwindow:process(mousex,mousey,button,event,wheel)
     return false
+end
+local function keypress(key,nkey,modifier,event)
+    if nkey==27 then hidden_mode=true return false end
+    if not hidden_mode then return false end
 end
 --small button on right to bring up main menu
 local WHITE = {255,255,255,255}
@@ -721,10 +738,15 @@ function ui_button.changedir(self)
     ui_button.reloadpressed()
     save_last()
 end
+local lastpaused
 function ui_button.sidepressed(self)
     hidden_mode = not hidden_mode
     if not hidden_mode then
+        lastpaused = tpt.set_pause()
+        tpt.set_pause(1)
         if firstload then ui_button.reloadpressed() firstload=false end
+    else
+        tpt.set_pause(lastpaused)
     end
 end
 function ui_button.donepressed(self)
@@ -819,3 +841,4 @@ if started~="" then
 end
 previous_running = nil --only read previous files once
 tpt.register_mouseevent(mouseclick)
+tpt.register_keypress(keypress)
