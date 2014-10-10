@@ -23,22 +23,22 @@
 --Auto-update for OTHER scripts now works, is a bit messy, will fix later, but nothing should change for users to use this
 --  Place a line '--VER num UPDATE link' in one of the first four lines of the file, see my above example
 --  The link at top downloads a file that contains ONLY version,full link,and prints the rest(changelog). See my link for example
+
+if not fs then error("TPT version not supported") end
+
 local issocket,socket = pcall(require,"socket")
 local VERSION = "2.21"
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
-local cmd = 'dir /b /o /a:-h /s '
 local WINDOWS=true
 local EXE_NAME = "Powder.exe"
 local CHECKUPDATE = false
 if os.getenv('HOME') then
     PATH_SEP = '/'
-    cmd = 'ls -1R '
     EXE_NAME = "powder"
     WINDOWS=false
 end
 local filenames = {}
-local num_files = 0
 local previous_running = {}
 local requiresrestart=false
 local TPTver = tpt.version
@@ -87,24 +87,25 @@ end
 load_last()
 --get list of files in scripts folder
 local function load_filenames()
-    filenames = {}
-    local mainFolder = TPT_LUA_PATH..PATH_SEP
-    local content = io.popen(cmd..'"'..mainFolder..'"')
-    local line = content:read("*l")
-    --use only .lua files, save this list somewhere
-    local curFold=""
-    if WINDOWS and line then mainFolder=line:gsub("[^\\]-$","") end
-	while line do
-		if line:find("%.lua$") then
-        	if WINDOWS then line = line:gsub(mainFolder,"") end
-			table.insert(filenames,curFold..line)
-        elseif line:find(mainFolder..".+:$") then
-        	curFold = line:sub(#mainFolder+1):sub(1,-2)..PATH_SEP
+    local function searchRecursive(directory)
+        local dirlist = fs.list(directory)
+        if not dirlist then return end
+        for i,v in ipairs(dirlist) do
+            file = directory.."/"..v
+            if fs.isDirectory(file) then
+                searchRecursive(file)
+            elseif fs.isFile(file) then
+                if file:find("%.lua$") then
+                    local toinsert = file:sub(#TPT_LUA_PATH+2)
+                    if WINDOWS then
+                        toinsert = toinsert:gsub("/", "\\") --not actually required
+                    end
+                    table.insert(filenames, toinsert)
+                end
+            end
         end
-        line = content:read("*l")
     end
-    content:close()
-    num_files = #filenames
+    searchRecursive(TPT_LUA_PATH)
 end
 --ui object stuff
 local ui_base local ui_box local ui_line local ui_text local ui_button local ui_scrollbar local ui_checkbox local ui_console local ui_window
@@ -686,11 +687,11 @@ function ui_button.reloadpressed(self)
     load_filenames()
     gen_buttons()
     mainwindow.checkbox:updatescroll()
-    if num_files==0 then
+    if #filenames == 0 then
         MANAGER_PRINT("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
-                os.execute('mkdir '..TPT_LUA_PATH)
+        fs.makeDirectory(TPT_LUA_PATH)
     else
-        MANAGER_PRINT("Reloaded file list, found "..num_files.." scripts")
+        MANAGER_PRINT("Reloaded file list, found "..#filenames.." scripts")
     end
 end
 function ui_button.selectnone(self)
@@ -771,11 +772,7 @@ function ui_button.checkupdate(self)
             self.t.text="UPDATE" self.w=40 self.x2=self.x2-36 self.t:setcolor(25,255,25)
         else MANAGER_PRINT("v"..VERSION.." is latest version") end
     else
-        if WINDOWS then
-            os.execute("MOVE autorun.lua autorunold.lua")
-        else
-            os.execute("mv autorun.lua autorunold.lua")
-        end
+        fileSystem.move("autorun.lua", "autorunold.lua")
         download_script(fullupdateID,'autorun.lua')
         do_restart()
     end
@@ -798,7 +795,7 @@ gen_buttons = function()
         if but.running then running[but.t.text]=true end
     end
     mainwindow.checkbox:clear()
-    for i=1, num_files do
+    for i=1,#filenames do
         mainwindow.checkbox:add(ui_button.pressed,filenames[i])
         if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
     end
