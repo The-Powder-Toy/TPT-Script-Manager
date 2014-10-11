@@ -109,7 +109,8 @@ local function load_filenames()
     searchRecursive(TPT_LUA_PATH)
 end
 --ui object stuff
-local ui_base local ui_box local ui_line local ui_text local ui_button local ui_scrollbar local ui_checkbox local ui_console local ui_window
+local ui_base local ui_box local ui_line local ui_text local ui_button local ui_scrollbar local ui_tooltip local ui_checkbox local ui_console local ui_window
+local tooltip
 ui_base = {
 new = function()
     local b={}
@@ -319,6 +320,43 @@ new = function(x,y,w,h,f,text)
     return b
 end
 }
+ui_tooltip = {
+new = function(x,y,w,text)
+    local b = ui_box.new(x,y-1,w,0)
+	function b:updatetooltip(tooltip)
+        self.tooltip = tooltip
+        self.length = #tooltip
+        self.lines = 0
+        local start,last = 1,2
+        while last <= self.length do
+            while tpt.textwidth(self.tooltip:sub(start,last)) < w and last <= self.length and self.tooltip:sub(last,last) ~= '\n' do
+                last = last + 1
+            end
+            if last <= self.length and self.tooltip:sub(last,last) ~= '\n' then
+                self.length = self.length + 1
+	            self.tooltip = self.tooltip:sub(1,last-1).."\n"..self.tooltip:sub(last)
+            end
+            last = last + 1
+            start = last
+            self.lines = self.lines + 1
+	    end
+        self.h = self.lines*12+2
+        --if self.lines == 1 then self.w = tpt.textwidth(self.tooltip)+3 end
+        self.drawbox = tooltip ~= ""
+        self.drawbackground = tooltip ~= ""
+    end
+    b:updatetooltip(text)
+    b:setbackground(0,0,0,255)
+	b.drawbackground = true
+    b:drawadd(function(self)
+        if self.tooltip ~= "" then
+            tpt.drawtext(self.x+1,self.y+2,self.tooltip)
+        end
+    end)
+	function b:process(mx,my,button,event,wheel) end
+	return b
+end
+}
 ui_checkbox = {
 up_button = function(x,y,w,h,f,text,filename)
     local b=ui_button.new(x,y,w,h,f,text)
@@ -344,7 +382,9 @@ new_button = function(x,y,w,h,splitx,f,text)
     b.drawbox=false
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
-        if tpt.mousex>=self.x and tpt.mousex<=self.x2 and tpt.mousey>=self.y and tpt.mousey<=self.y2 then
+        if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
+		    tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
+			tooltip:updatetooltip(text)
             self.drawbackground=true
         else
             self.drawbackground=false
@@ -429,6 +469,9 @@ new = function(x,y,w,h)
             end
         end
         requiresrestart=restart
+        if tpt.mousex < self.x or tpt.mousex > self.splitx or tpt.mousey < self.y or tpt.mousey > self.y2 then
+            if tooltip.text ~= "" then tooltip:updatetooltip("") end
+        end
     end)
     box:moveadd(function(self,x,y)
         for i,line in ipairs(self.lines) do
@@ -540,6 +583,7 @@ local mainwindow = ui_window.new(50,50,525,300)
 mainwindow:setbackground(10,10,10,235) mainwindow.drawbackground=true
 mainwindow:add(ui_console.new(275,148,300,189),"menuconsole")
 mainwindow:add(ui_checkbox.new(50,65,225,272),"checkbox")
+tooltip = ui_tooltip.new(0,1,150,"")
 --save settings
 local function save_last()
     local savestring=""
@@ -688,6 +732,7 @@ local function step()
     end
     tpt.drawtext(55,55,"Click a script to toggle, hit DONE when finished")
     tpt.drawtext(474,55,"Script Manager v"..VERSION)--479 for simple versions
+    tooltip:draw()
 end
 local function mouseclick(mousex,mousey,button,event,wheel)
     sidebutton:process(mousex,mousey,button,event,wheel)
