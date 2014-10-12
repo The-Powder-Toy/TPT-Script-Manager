@@ -39,7 +39,7 @@ if os.getenv('HOME') then
 end
 local filenames = {}
 local onlinescripts = {}
-local previous_running = {}
+local running = {}
 local requiresrestart=false
 local hidden_mode=true
 local online = false
@@ -69,9 +69,7 @@ local function load_last()
             local tok=lines[i]:sub(1,3)
             local str=lines[i]:sub(5)
             if tok=="SAV" then
-                local list={}
-                for word in string.gmatch(str, "\'(.-)\'") do table.insert(list,word) end
-                previous_running=list
+                for word in string.gmatch(str, "\'(.-)\'") do running[word] = true end
             elseif tok=="EXE" then
                 EXE_NAME=str
             elseif tok=="DIR" then
@@ -352,6 +350,7 @@ new = function(x,y,w,text)
         if self.tooltip ~= "" then
             tpt.drawtext(self.x+1,self.y+2,self.tooltip)
         end
+        self:updatetooltip("")
     end)
     function b:process(mx,my,button,event,wheel) end
     return b
@@ -377,7 +376,6 @@ new_button = function(x,y,w,h,splitx,f,text)
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+16,y+2,splitx-16)
     b.selected=false
-    b.running=false
     b.checkbut=ui_checkbox.up_button(x+splitx+33,y,33,10,ui_button.scriptcheck,"Check",text)
     b.drawbox=false
     b:setbackground(127,127,127,100)
@@ -393,7 +391,7 @@ new_button = function(x,y,w,h,splitx,f,text)
         tpt.drawrect(self.x+3,self.y+1,8,8)
         if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,150,150,150)
         elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8,8) end
-        if self.running then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
+        if running[self.t.text] then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
     b:moveadd(function(self,x,y)
@@ -449,7 +447,7 @@ new = function(x,y,w,h)
         self.scrollbar:draw()
         local restart = false
         for i,check in ipairs(self.list) do
-            if not check.selected and check.running then
+            if not check.selected and running[check.t.text] then
                 restart=true
             end
             if i>self.scrollbar.pos and i<=self.scrollbar.pos+self.max_lines then
@@ -457,9 +455,6 @@ new = function(x,y,w,h)
             end
         end
         requiresrestart=restart
-        if tpt.mousex < self.x or tpt.mousex > self.splitx or tpt.mousey < self.y or tpt.mousey > self.y2 then
-            if tooltip.text ~= "" then tooltip:updatetooltip("") end
-        end
     end)
     box:moveadd(function(self,x,y)
         for i,line in ipairs(self.lines) do
@@ -559,9 +554,11 @@ new = function(x,y,w,h)
     end)
     function w:process(mx,my,button,event,wheel)
         if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then return false end
+        local ret
         for i,sub in ipairs(self.sub) do
-            if sub:process(mx,my,button,event,wheel) then return true end
+            if sub:process(mx,my,button,event,wheel) then ret = true end
         end
+        return ret
     end
     return w
 end
@@ -711,7 +708,7 @@ local function do_restart()
 end
 --TPT interface
 local function step()
-    tpt.fillrect(0,0,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
+    tpt.fillrect(-1,-1,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
     mainwindow:draw()
     tpt.drawtext(280,140,"Console Output:")
     if requiresrestart then
@@ -802,20 +799,27 @@ function ui_button.sidepressed(self)
         tpt.set_pause(lastpaused)
     end
 end
+local donebutton
 function ui_button.donepressed(self)
     if requiresrestart then do_restart() return end
     hidden_mode=true
     for i,but in ipairs(mainwindow.checkbox.list) do
-        if not but.running and but.selected then
+        if not running[but.t.text] and but.selected then
         local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..but.t.text)
-            if not status then MANAGER_PRINT(err,255,0,0) but.selected=false
+            if not status then
+                MANAGER_PRINT(err,255,0,0)
+                print(err)
+                but.selected = false
             else
                 MANAGER_PRINT("Started "..but.t.text)
-                but.running=true
+                running[but.t.text] = true
             end
         end
     end
     save_last()
+end
+function ui_button.downloadpressed(self)
+    
 end
  
 function ui_button.pressed(self)
@@ -853,17 +857,31 @@ function ui_button.checkupdate(self)
     end
 end
 function ui_button.localview(self)
-    online = false
-	gen_buttons()
+    if online then
+        online = false
+        gen_buttons()
+        donebutton.t.text = "DONE"
+        donebutton.w = 29 donebutton.x2 = donebutton.x + donebutton.w
+        donebutton.f = ui_button.donepressed
+    end
 end
 function ui_button.onlineview(self)
-    online = true
-	gen_buttons()
+    if not online then
+        online = true
+        gen_buttons()
+        donebutton.t.text = "DOWNLOAD"
+        donebutton.w = 55 donebutton.x2 = donebutton.x + donebutton.w
+        donebutton.f = ui_button.downloadpressed
+    end
 end
 --add buttons to window
-mainwindow:add(ui_button.new(55,339,29,10,ui_button.donepressed,"DONE"))
-mainwindow:add(ui_button.new(104,339,40,10,ui_button.sidepressed,"CANCEL"))
-mainwindow:add(ui_button.new(152,339,29,10,ui_button.selectnone,"NONE"))
+donebutton = ui_button.new(55,339,29,10,ui_button.donepressed,"DONE")
+mainwindow:add(donebutton)
+mainwindow:add(ui_button.new(134,339,40,10,ui_button.sidepressed,"CANCEL"))
+--mainwindow:add(ui_button.new(152,339,29,10,ui_button.selectnone,"NONE"))
+local nonebutton = ui_button.new(53,81,8,8,ui_button.selectnone,"")
+nonebutton.drawbox = true
+mainwindow:add(nonebutton)
 mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
 mainwindow:add(ui_button.new(278,67,40,10,ui_button.reloadpressed,"RELOAD"))
 mainwindow:add(ui_button.new(338,67,80,10,ui_button.changeexename,"Change exe name"))
@@ -879,11 +897,6 @@ sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 
 local function gen_buttons_local()
     --remember if a script was running before reload
-    local running={}
-    for i,but in ipairs(mainwindow.checkbox.list) do
-        if but.running then running[but.t.text]=true end
-    end
-    mainwindow.checkbox:clear()
     for i=1,#filenames do
         mainwindow.checkbox:add(ui_button.pressed,filenames[i])
         if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
@@ -904,13 +917,12 @@ local function gen_buttons_local()
 end
 local function gen_buttons_online()
     local list = download_file("http://starcatcher.us/scripts/main.lua")
-	mainwindow.checkbox:clear()
-	onlinescripts = {}
-	local count = 1
-	for i in string.gmatch(list, "[^\n]+") do
+    onlinescripts = {}
+    local count = 1
+    for i in string.gmatch(list, "[^\n]+") do
         local t = {}
         local ID = 0
-	    for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
+        for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
             if k == "ID" then
                 ID = tonumber(v)
             else
@@ -918,14 +930,15 @@ local function gen_buttons_online()
             end
         end
         onlinescripts[ID] = t
-        mainwindow.checkbox:add(nil, t["name"])
+        mainwindow.checkbox:add(ui_button.pressed, t["name"])
         mainwindow.checkbox.list[count].info = t
-		mainwindow.checkbox.list[count].checkbut.curversion = "1"
-		mainwindow.checkbox.list[count].checkbut.canupdate = true
+        mainwindow.checkbox.list[count].checkbut.curversion = "1"
+        mainwindow.checkbox.list[count].checkbut.canupdate = true
         count = count + 1
     end
 end
 gen_buttons = function()
+    mainwindow.checkbox:clear()
     if online then
         gen_buttons_online()
     else
@@ -939,16 +952,18 @@ gen_buttons()
 tpt.register_step(smallstep)
 --load previously running scripts
 local started = ""
-for i,prev in ipairs(previous_running) do
+for prev,v in pairs(running) do
     local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..prev)
-    if not status then MANAGER_PRINT(err,255,0,0)
-    else started=started.." "..prev
-            local newbut = mainwindow.checkbox:add(ui_button.pressed,prev)
-                newbut.running=true newbut.selected=true end
+    if not status then
+        MANAGER_PRINT(err,255,0,0)
+    else
+        started=started.." "..prev
+        local newbut = mainwindow.checkbox:add(ui_button.pressed,prev)
+        newbut.selected=true
+    end
 end
 if started~="" then
     MANAGER_PRINT("Auto started"..started)
 end
-previous_running = nil --only read previous files once
 tpt.register_mouseevent(mouseclick)
 tpt.register_keypress(keypress)
