@@ -24,9 +24,8 @@
 --  Place a line '--VER num UPDATE link' in one of the first four lines of the file, see my above example
 --  The link at top downloads a file that contains ONLY version,full link,and prints the rest(changelog). See my link for example
 
-if not fs then error("TPT version not supported") end
+if not socket then error("TPT version not supported") end
 
-local issocket,socket = pcall(require,"socket")
 local VERSION = "2.21"
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
@@ -39,10 +38,11 @@ if os.getenv('HOME') then
     WINDOWS=false
 end
 local filenames = {}
+local onlinescripts = {}
 local previous_running = {}
 local requiresrestart=false
-local TPTver = tpt.version
 local hidden_mode=true
+local online = false
 local firstload=true
 local updatecheckID = 'http://www.pastebin.com/raw.php?i=FKxVYV01'
 local fullupdateID = nil
@@ -334,7 +334,7 @@ new = function(x,y,w,text)
             end
             if last <= self.length and self.tooltip:sub(last,last) ~= '\n' then
                 self.length = self.length + 1
-	            self.tooltip = self.tooltip:sub(1,last-1).."\n"..self.tooltip:sub(last)
+                self.tooltip = self.tooltip:sub(1,last-1).."\n"..self.tooltip:sub(last)
             end
             last = last + 1
             start = last
@@ -353,8 +353,8 @@ new = function(x,y,w,text)
             tpt.drawtext(self.x+1,self.y+2,self.tooltip)
         end
     end)
-	function b:process(mx,my,button,event,wheel) end
-	return b
+    function b:process(mx,my,button,event,wheel) end
+    return b
 end
 }
 ui_checkbox = {
@@ -383,8 +383,8 @@ new_button = function(x,y,w,h,splitx,f,text)
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
         if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
-		    tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
-			tooltip:updatetooltip(text)
+            tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
+            tooltip:updatetooltip(self.info["description"])
             self.drawbackground=true
         else
             self.drawbackground=false
@@ -436,21 +436,9 @@ new = function(x,y,w,h)
     end
     function box:add(f,text)
         local but = ui_checkbox.new_button(self.x,self.y+1+((self.numlist+1)*10),tpt.textwidth(text)+4,10,self.max_text_width,f,text)
-        local f = io.open(TPT_LUA_PATH..PATH_SEP..text)
-        if f then
-            local line = f:read("*l")
-            local count=0 --check first 5 lines of files for update
-            while line and count<5 do
-                count=count+1
-                local _,_,ver,link = line:find("^--VER (.*) UPDATE (.*)$")
-                if ver and link then but.checkbut.canupdate=true but.checkbut.curversion=ver but.checkbut.checkLink=link end
-                line = f:read("*l")
-            end
-            f:close()
-        end
         table.insert(self.list,but)
         self.numlist = #self.list
-                return but
+        return but
     end
     box:drawadd(function (self)
         tpt.drawtext(self.x+16,self.y+2,"Files in "..TPT_LUA_PATH.." folder")
@@ -582,7 +570,7 @@ end
 local mainwindow = ui_window.new(50,50,525,300)
 mainwindow:setbackground(10,10,10,235) mainwindow.drawbackground=true
 mainwindow:add(ui_console.new(275,148,300,189),"menuconsole")
-mainwindow:add(ui_checkbox.new(50,65,225,272),"checkbox")
+mainwindow:add(ui_checkbox.new(50,80,225,257),"checkbox")
 tooltip = ui_tooltip.new(0,1,150,"")
 --save settings
 local function save_last()
@@ -624,7 +612,7 @@ function MANAGER_DOWNLOAD(url)
 end
 --Get various info about the system (if on windows, script directory, path seperator, if socket is loaded)
 function MANAGER_SYSINFO()
-    return {["isWindows"]=WINDOWS,["scriptDir"]=TPT_LUA_PATH,["pathSep"]=PATH_SEP,["socket"]=issocket}
+    return {["isWindows"]=WINDOWS,["scriptDir"]=TPT_LUA_PATH,["pathSep"]=PATH_SEP,["socket"]=true}
 end
 --Get whether or not the manager window is hidden or not
 function MANAGER_HIDDEN()
@@ -658,7 +646,6 @@ end
 --mniip's download thing (mostly)
 local pattern = "http://w*%.?(.-)(/.*)"
 local function download_file(url)
-    if not issocket then MANAGER_PRINT("No lua socket found") return end
     local _,_,host,rest = url:find(pattern)
     if not host or not rest then MANAGER_PRINT("Bad link") return end
     local conn=socket.tcp()
@@ -865,6 +852,14 @@ function ui_button.checkupdate(self)
         do_restart()
     end
 end
+function ui_button.localview(self)
+    online = false
+	gen_buttons()
+end
+function ui_button.onlineview(self)
+    online = true
+	gen_buttons()
+end
 --add buttons to window
 mainwindow:add(ui_button.new(55,339,29,10,ui_button.donepressed,"DONE"))
 mainwindow:add(ui_button.new(104,339,40,10,ui_button.sidepressed,"CANCEL"))
@@ -874,9 +869,15 @@ mainwindow:add(ui_button.new(278,67,40,10,ui_button.reloadpressed,"RELOAD"))
 mainwindow:add(ui_button.new(338,67,80,10,ui_button.changeexename,"Change exe name"))
 mainwindow:add(ui_button.new(438,67,52,10,ui_button.changedir,"Change dir"))
 mainwindow:add(ui_button.new(278,127,76,10,ui_button.checkupdate,"CHECK UPDATE"))
+local tempbutton = ui_button.new(60, 65, 30, 10, ui_button.localview, "Local")
+tempbutton.drawbox = true
+mainwindow:add(tempbutton)
+tempbutton = ui_button.new(100, 65, 35, 10, ui_button.onlineview, "Online")
+tempbutton.drawbox = true
+mainwindow:add(tempbutton)
 sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
- 
-gen_buttons = function()
+
+local function gen_buttons_local()
     --remember if a script was running before reload
     local running={}
     for i,but in ipairs(mainwindow.checkbox.list) do
@@ -886,6 +887,49 @@ gen_buttons = function()
     for i=1,#filenames do
         mainwindow.checkbox:add(ui_button.pressed,filenames[i])
         if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
+        mainwindow.checkbox.list[i].info = {["name"]=filenames[i], ["description"]=""}
+        local f = io.open(TPT_LUA_PATH..PATH_SEP..filenames[i])
+        if f then
+            local line = f:read("*l")
+            local count=0 --check first 5 lines of files for update
+            while line and count<5 do
+                count=count+1
+                local _,_,ver,link = line:find("^--VER (.*) UPDATE (.*)$")
+                if ver and link then mainwindow.checkbox.list[i].checkbut.canupdate=true mainwindow.checkbox.list[i].checkbut.curversion=ver mainwindow.checkbox.list[i].checkbut.checkLink=link end
+                line = f:read("*l")
+            end
+            f:close()
+        end
+    end
+end
+local function gen_buttons_online()
+    local list = download_file("http://starcatcher.us/scripts/main.lua")
+	mainwindow.checkbox:clear()
+	onlinescripts = {}
+	local count = 1
+	for i in string.gmatch(list, "[^\n]+") do
+        local t = {}
+        local ID = 0
+	    for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
+            if k == "ID" then
+                ID = tonumber(v)
+            else
+                t[k]= tonumber(v) or v
+            end
+        end
+        onlinescripts[ID] = t
+        mainwindow.checkbox:add(nil, t["name"])
+        mainwindow.checkbox.list[count].info = t
+		mainwindow.checkbox.list[count].checkbut.curversion = "1"
+		mainwindow.checkbox.list[count].checkbut.canupdate = true
+        count = count + 1
+    end
+end
+gen_buttons = function()
+    if online then
+        gen_buttons_online()
+    else
+        gen_buttons_local()
     end
     mainwindow.checkbox:updatescroll()
 end
