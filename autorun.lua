@@ -38,12 +38,12 @@ if os.getenv('HOME') then
     WINDOWS=false
 end
 local filenames = {}
+local localscripts = {}
 local onlinescripts = {}
 local running = {}
 local requiresrestart=false
 local hidden_mode=true
 local online = false
-local firstload=true
 local updatecheckID = 'http://www.pastebin.com/raw.php?i=FKxVYV01'
 local fullupdateID = nil
 local gen_buttons
@@ -51,6 +51,68 @@ local sidebutton
 local download_file
 local settings = {}
 math.randomseed(os.time()) math.random() math.random() math.random() --some filler randoms
+
+--get line that can be saved into scriptinfo file
+local function scriptInfoString(info)
+    --Write table into data format
+    if type(info)~="table" then return end
+    local t = {}
+    for k,v in pairs(info) do
+        table.insert(t,k..":\""..v.."\"")
+    end
+    local rstr = table.concat(t,","):gsub("\n","\\n")
+    return rstr
+end
+
+--read a scriptinfo line
+local function readScriptInfo(list)
+    local scriptlist = {}
+    for i in string.gmatch(list, "[^\n]+") do
+        local t = {}
+        local ID = 0
+        for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
+            if k == "ID" then
+                ID = tonumber(v)
+            end
+            t[k]= tonumber(v) or v
+        end
+        scriptlist[ID] = t
+    end
+    return scriptlist
+end
+
+--save settings
+local function save_last()
+    local savestring=""
+    for script,v in pairs(running) do
+        savestring = savestring.." \'"..script.."\'"
+    end
+    savestring = "SAV "..savestring.."\nEXE "..EXE_NAME.."\nDIR "..TPT_LUA_PATH
+    for k,t in pairs(settings) do
+	for n,v in pairs(t) do
+	    savestring = savestring.."\nSET "..k.." "..n..":'"..v.."'"	    
+	end
+    end
+    local f
+    if TPT_LUA_PATH == "scripts" then
+        f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
+    else
+        f = io.open("autorunsettings.txt", "w")
+    end
+    if f then
+        f:write(savestring)
+        f:close()
+    end
+
+    f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo", "w")
+    if f then
+        for k,v in pairs(localscripts) do
+            f:write(scriptInfoString(v).."\n")
+        end
+        f:close()
+    end
+end
+
 --load settings before anything else
 local function load_last()
     local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt","r")
@@ -80,6 +142,13 @@ local function load_last()
 		else settings[ident]={[name]=val} end
             end
         end
+    end
+
+    f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo")
+    if f then
+        local lines = f:read("*a")
+        f:close()
+        localscripts = readScriptInfo(lines)
     end
 end
 load_last()
@@ -321,7 +390,7 @@ end
 ui_tooltip = {
 new = function(x,y,w,text)
     local b = ui_box.new(x,y-1,w,0)
-	function b:updatetooltip(tooltip)
+    function b:updatetooltip(tooltip)
         self.tooltip = tooltip
         self.length = #tooltip
         self.lines = 0
@@ -381,8 +450,10 @@ new_button = function(x,y,w,h,splitx,f,text)
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
         if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
-            tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
-            tooltip:updatetooltip(self.info["description"])
+            if online and onlinescripts[self.ID]["description"] then
+                tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
+                tooltip:updatetooltip(onlinescripts[self.ID]["description"])
+            end
             self.drawbackground=true
         else
             self.drawbackground=false
@@ -569,29 +640,7 @@ mainwindow:setbackground(10,10,10,235) mainwindow.drawbackground=true
 mainwindow:add(ui_console.new(275,148,300,189),"menuconsole")
 mainwindow:add(ui_checkbox.new(50,80,225,257),"checkbox")
 tooltip = ui_tooltip.new(0,1,150,"")
---save settings
-local function save_last()
-    local savestring=""
-    for i,but in ipairs(mainwindow.checkbox.list) do
-        if but.selected then savestring = savestring.." \'"..but.t.text.."\'" end
-    end
-    savestring = "SAV "..savestring.."\nEXE "..EXE_NAME.."\nDIR "..TPT_LUA_PATH
-    for k,t in pairs(settings) do
-	for n,v in pairs(t) do
-	    savestring = savestring.."\nSET "..k.." "..n..":'"..v.."'"	    
-	end
-    end
-    local f
-    if TPT_LUA_PATH == "scripts" then
-        f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
-    else
-        f = io.open("autorunsettings.txt", "w")
-    end
-    if f then
-        f:write(savestring)
-        f:close()
-    end
-end
+
 --Some API functions you can call from other scripts
 --put 'using_manager=MANAGER_EXISTS' or similar in your scripts, using_manager will be true if the manager is active
 MANAGER_EXISTS = true
@@ -791,35 +840,69 @@ end
 local lastpaused
 function ui_button.sidepressed(self)
     hidden_mode = not hidden_mode
+    online = false
     if not hidden_mode then
         lastpaused = tpt.set_pause()
         tpt.set_pause(1)
-        if firstload then ui_button.reloadpressed() firstload=false end
+        ui_button.reloadpressed()
     else
         tpt.set_pause(lastpaused)
     end
 end
 local donebutton
 function ui_button.donepressed(self)
-    if requiresrestart then do_restart() return end
-    hidden_mode=true
+    hidden_mode = true
+    running = {}
     for i,but in ipairs(mainwindow.checkbox.list) do
-        if not running[but.t.text] and but.selected then
-        local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..but.t.text)
+        if but.selected then
+            if requiresrestart then
+                running[but.t.text] = true
+            elseif not running[but.t.text] then
+                local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..but.t.text)
+                if not status then
+                    MANAGER_PRINT(err,255,0,0)
+                    print(err)
+                    but.selected = false
+                else
+                    MANAGER_PRINT("Started "..but.t.text)
+                    running[but.t.text] = true
+                end
+            end
+        end
+    end
+    if requiresrestart then do_restart() return end
+    save_last()
+end
+function ui_button.downloadpressed(self)
+    for i,but in ipairs(mainwindow.checkbox.list) do
+        if but.selected then
+            local function get_script(butt)
+                local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
+                local name = TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
+                if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
+                    fs.makeDirectory(TPT_LUA_PATH..PATH_SEP.."downloaded")
+                end
+                local file = io.open(name, "w")
+                if not file then error("could not open "..name) end
+                file:write(script)
+                file:close()
+                localscripts[butt.ID] = onlinescripts[butt.ID]
+                dofile(name)
+            end
+            local status,err = pcall(get_script, but)
             if not status then
                 MANAGER_PRINT(err,255,0,0)
                 print(err)
                 but.selected = false
             else
-                MANAGER_PRINT("Started "..but.t.text)
+                MANAGER_PRINT("Downloaded and started "..but.t.text)
                 running[but.t.text] = true
             end
         end
     end
+    hidden_mode=true
+    online = false
     save_last()
-end
-function ui_button.downloadpressed(self)
-    
 end
  
 function ui_button.pressed(self)
@@ -900,7 +983,6 @@ local function gen_buttons_local()
     for i=1,#filenames do
         mainwindow.checkbox:add(ui_button.pressed,filenames[i])
         if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
-        mainwindow.checkbox.list[i].info = {["name"]=filenames[i], ["description"]=""}
         local f = io.open(TPT_LUA_PATH..PATH_SEP..filenames[i])
         if f then
             local line = f:read("*l")
@@ -917,22 +999,12 @@ local function gen_buttons_local()
 end
 local function gen_buttons_online()
     local list = download_file("http://starcatcher.us/scripts/main.lua")
-    onlinescripts = {}
+    onlinescripts = readScriptInfo(list)
     local count = 1
-    for i in string.gmatch(list, "[^\n]+") do
-        local t = {}
-        local ID = 0
-        for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
-            if k == "ID" then
-                ID = tonumber(v)
-            else
-                t[k]= tonumber(v) or v
-            end
-        end
-        onlinescripts[ID] = t
-        mainwindow.checkbox:add(ui_button.pressed, t["name"])
-        mainwindow.checkbox.list[count].info = t
-        mainwindow.checkbox.list[count].checkbut.curversion = "1"
+    for k,v in pairs(onlinescripts) do
+        mainwindow.checkbox:add(ui_button.pressed, v["name"])
+        mainwindow.checkbox.list[count].ID = k
+        mainwindow.checkbox.list[count].checkbut.curversion = v["version"] or "1.00"
         mainwindow.checkbox.list[count].checkbut.canupdate = true
         count = count + 1
     end
