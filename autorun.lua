@@ -67,16 +67,13 @@ end
 --read a scriptinfo line
 local function readScriptInfo(list)
     local scriptlist = {}
-    for i in string.gmatch(list, "[^\n]+") do
+    for i in list:gmatch("[^\n]+") do
         local t = {}
         local ID = 0
         for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
-            if k == "ID" then
-                ID = tonumber(v)
-            end
-            t[k]= tonumber(v) or v
+            t[k]= tonumber(v) or v:gsub("\\n","\n")
         end
-        scriptlist[ID] = t
+        scriptlist[t.ID] = t
     end
     return scriptlist
 end
@@ -144,7 +141,7 @@ local function load_last()
         end
     end
 
-    f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo")
+    f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo","r")
     if f then
         local lines = f:read("*a")
         f:close()
@@ -876,9 +873,12 @@ end
 function ui_button.downloadpressed(self)
     for i,but in ipairs(mainwindow.checkbox.list) do
         if but.selected then
+            --maybe do better display names later
+            local displayName
             local function get_script(butt)
                 local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
-                local name = TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
+                displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
+                local name = TPT_LUA_PATH..PATH_SEP..displayName
                 if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
                     fs.makeDirectory(TPT_LUA_PATH..PATH_SEP.."downloaded")
                 end
@@ -896,12 +896,12 @@ function ui_button.downloadpressed(self)
                 but.selected = false
             else
                 MANAGER_PRINT("Downloaded and started "..but.t.text)
-                running[but.t.text] = true
+                running[displayName] = true
             end
         end
     end
     hidden_mode=true
-    online = false
+    ui_button.localview()
     save_last()
 end
  
@@ -1028,12 +1028,14 @@ for prev,v in pairs(running) do
     local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..prev)
     if not status then
         MANAGER_PRINT(err,255,0,0)
+        running[prev] = nil
     else
         started=started.." "..prev
         local newbut = mainwindow.checkbox:add(ui_button.pressed,prev)
         newbut.selected=true
     end
 end
+save_last()
 if started~="" then
     MANAGER_PRINT("Auto started"..started)
 end
