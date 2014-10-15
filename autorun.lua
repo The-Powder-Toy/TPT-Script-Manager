@@ -436,11 +436,11 @@ up_button = function(x,y,w,h,f,text,filename)
     end)
     return b
 end,
-new_button = function(x,y,w,h,splitx,f,text)
+new_button = function(x,y,w,h,splitx,f,f2,text)
     local b = ui_box.new(x,y,splitx,h)
-    b.f=f
+    b.f=f b.f2=f2
     b.splitx = splitx
-    b.t=ui_text.newscroll(text,x+16,y+2,splitx-16)
+    b.t=ui_text.newscroll(text,x+24,y+2,splitx-24)
     b.selected=false
     b.checkbut=ui_checkbox.up_button(x+splitx+33,y,33,10,ui_button.scriptcheck,"Check",text)
     b.drawbox=false
@@ -456,9 +456,18 @@ new_button = function(x,y,w,h,splitx,f,text)
             self.drawbackground=false
         end
         self.t:draw()
-        tpt.drawrect(self.x+3,self.y+1,8,8)
-        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+3,self.y+1,8,8,150,150,150)
-        elseif self.selected then tpt.fillrect(self.x+3,self.y+1,8,8) end
+        if self.f2 then
+            if self.deletealmostselected then
+                self.deletealmostselected = false
+                tpt.drawtext(self.x+1, self.y+1, "\134", 255, 48, 32, 255)
+            else
+                tpt.drawtext(self.x+1, self.y+1, "\134", 160, 48, 32, 255)
+            end
+            tpt.drawtext(self.x+1, self.y+1, "\133", 255, 255, 255, 255)
+        end
+        tpt.drawrect(self.x+12,self.y+1,8,8)
+        if self.almostselected then self.almostselected=false tpt.fillrect(self.x+12,self.y+1,8,8,150,150,150)
+        elseif self.selected then tpt.fillrect(self.x+12,self.y+1,8,8) end
         if running[self.t.text] then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
@@ -467,7 +476,10 @@ new_button = function(x,y,w,h,splitx,f,text)
         self.checkbut:onmove(x,y)
     end)
     function b:process(mx,my,button,event,wheel)
-        if mx<=self.x+self.splitx then
+        if self.f2 and mx <= self.x+8 then
+            if event==3 then self.deletealmostselected = true end
+            if event==2 then self:f2() end
+        elseif mx<=self.x+self.splitx then
             if event==3 then self.almostselected=true end
             if event==2 then self:f() end
             self.t:process(mx,my,button,event,wheel)
@@ -488,7 +500,7 @@ new = function(x,y,w,h)
     box.scrollbar = ui_scrollbar.new(box.x2-2,box.y+11,box.h-12,0,box.max_lines)
     box.lines={
         ui_line.new(box.x+1,box.y+10,box.x2-1,box.y+10,170,170,170),
-        ui_line.new(box.x+14,box.y+10,box.x+14,box.y2-1,170,170,170),
+        ui_line.new(box.x+22,box.y+10,box.x+22,box.y2-1,170,170,170),
         ui_line.new(box.splitx,box.y+10,box.splitx,box.y2-1,170,170,170),
         ui_line.new(box.splitx+9,box.y+10,box.splitx+9,box.y2-1,170,170,170),
         ui_line.new(box.splitx+33,box.y+10,box.splitx+33,box.y2-1,170,170,170),
@@ -500,14 +512,14 @@ new = function(x,y,w,h)
         self.list={}
         self.numlist=0
     end
-    function box:add(f,text)
-        local but = ui_checkbox.new_button(self.x,self.y+1+((self.numlist+1)*10),tpt.textwidth(text)+4,10,self.max_text_width,f,text)
+    function box:add(f,f2,text)
+        local but = ui_checkbox.new_button(self.x,self.y+1+((self.numlist+1)*10),tpt.textwidth(text)+4,10,self.max_text_width,f,f2,text)
         table.insert(self.list,but)
         self.numlist = #self.list
         return but
     end
     box:drawadd(function (self)
-        tpt.drawtext(self.x+16,self.y+2,"Files in "..TPT_LUA_PATH.." folder")
+        tpt.drawtext(self.x+24,self.y+2,"Files in "..TPT_LUA_PATH.." folder")
         tpt.drawtext(self.splitx+11,self.y+2,"Ver  Update")
         for i,line in ipairs(self.lines) do
             line:draw()
@@ -837,7 +849,7 @@ end
 local lastpaused
 function ui_button.sidepressed(self)
     hidden_mode = not hidden_mode
-    online = false
+    ui_button.localview()
     if not hidden_mode then
         lastpaused = tpt.set_pause()
         tpt.set_pause(1)
@@ -908,6 +920,18 @@ end
 function ui_button.pressed(self)
     self.selected = not self.selected
 end
+function ui_button.delete(self)
+    --there is no tpt.confirm() yet
+    if tpt.input("Delete File", "Delete "..self.t.text.."?", "yes", "no") == "yes" then
+        fs.removeFile(TPT_LUA_PATH.."/"..self.t.text:gsub("\\","/"))
+        if running[self.t.text] then running[self.t.text] = nil end
+        if localscripts[self.t.text] then localscripts[self.t.text] = nil end
+        save_last()
+        ui_button.localview()
+        load_filenames()
+        gen_buttons()
+    end
+end
 function ui_button.scriptcheck(self)
     if self.canupdate and not self.hasupdate then
         local version,updateLink,changelog=check_update(self.checkLink)
@@ -962,7 +986,7 @@ donebutton = ui_button.new(55,339,29,10,ui_button.donepressed,"DONE")
 mainwindow:add(donebutton)
 mainwindow:add(ui_button.new(134,339,40,10,ui_button.sidepressed,"CANCEL"))
 --mainwindow:add(ui_button.new(152,339,29,10,ui_button.selectnone,"NONE"))
-local nonebutton = ui_button.new(53,81,8,8,ui_button.selectnone,"")
+local nonebutton = ui_button.new(62,81,8,8,ui_button.selectnone,"")
 nonebutton.drawbox = true
 mainwindow:add(nonebutton)
 mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
@@ -981,7 +1005,7 @@ sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 local function gen_buttons_local()
     --remember if a script was running before reload
     for i=1,#filenames do
-        mainwindow.checkbox:add(ui_button.pressed,filenames[i])
+        mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
         if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
         local f = io.open(TPT_LUA_PATH..PATH_SEP..filenames[i])
         if f then
@@ -1002,7 +1026,7 @@ local function gen_buttons_online()
     onlinescripts = readScriptInfo(list)
     local count = 1
     for k,v in pairs(onlinescripts) do
-        mainwindow.checkbox:add(ui_button.pressed, v["name"])
+        mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
         mainwindow.checkbox.list[count].ID = k
         mainwindow.checkbox.list[count].checkbut.curversion = v["version"] or "1.00"
         mainwindow.checkbox.list[count].checkbut.canupdate = true
