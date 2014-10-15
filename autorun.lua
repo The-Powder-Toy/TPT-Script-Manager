@@ -66,6 +66,7 @@ end
 
 --read a scriptinfo line
 local function readScriptInfo(list)
+    if not list then return {} end
     local scriptlist = {}
     for i in list:gmatch("[^\n]+") do
         local t = {}
@@ -416,9 +417,13 @@ new = function(x,y,w,text)
         self.drawbox = tooltip ~= ""
         self.drawbackground = tooltip ~= ""
     end
+    function b:settooltip(tooltip_)
+        tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
+        tooltip:updatetooltip(tooltip_)
+    end
     b:updatetooltip(text)
     b:setbackground(0,0,0,255)
-	b.drawbackground = true
+    b.drawbackground = true
     b:drawadd(function(self)
         if self.tooltip ~= "" then
             tpt.drawtext(self.x+1,self.y+2,self.tooltip)
@@ -430,17 +435,9 @@ new = function(x,y,w,text)
 end
 }
 ui_checkbox = {
-up_button = function(x,y,w,h,f,text,filename)
+up_button = function(x,y,w,h,f,text)
     local b=ui_button.new(x,y,w,h,f,text)
-    b.updateLink=""
-    b.checkLink=""
-    b.curversion=""
-    b.canupdate=false --if file has UPDATE link
-    b.hasupdate=false --if link gives newer version
-    b.filename=filename
-    b:drawadd(function(self)
-        if self.canupdate then tpt.drawtext(self.x-22,self.y+2,self.curversion) end
-    end)
+    b.canupdate=false
     return b
 end,
 new_button = function(x,y,w,h,splitx,f,f2,text)
@@ -449,7 +446,8 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+24,y+2,splitx-24)
     b.selected=false
-    b.checkbut=ui_checkbox.up_button(x+splitx+33,y,33,10,ui_button.scriptcheck,"Check",text)
+    b.checkbut=ui_checkbox.up_button(x+splitx+9,y,33,10,ui_button.scriptcheck,"Update")
+    b.canupdate = false
     b.drawbox=false
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
@@ -461,11 +459,17 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
                 script = localscripts[self.ID]
             end
             if script then
-                tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
-                tooltip:updatetooltip(script["name"].." by "..script["author"].."\nVersion "..script["version"].."\n\n"..script["description"])
+                tooltip:settooltip(script["name"].." by "..script["author"].."\n\n"..script["description"])
             end
             self.drawbackground=true
         else
+            if tpt.mousey>=self.y and tpt.mousey<self.y2 then
+                if tpt.mousex < self.x2+10 and self.running then
+                    tooltip:settooltip(online and "downloaded" or "running")
+                elseif tpt.mousex > self.x2+33 and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
+                    tooltip:settooltip(onlinescripts[self.ID]["changelog"])
+                end
+            end
             self.drawbackground=false
         end
         self.t:draw()
@@ -482,7 +486,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
         if self.almostselected then self.almostselected=false tpt.fillrect(self.x+12,self.y+1,8,8,150,150,150)
         elseif self.selected then tpt.fillrect(self.x+12,self.y+1,8,8) end
         local filepath = self.ID and localscripts[self.ID] and localscripts[self.ID]["path"] or self.t.text
-        if running[filepath] then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
+        if self.running then tpt.drawtext(self.x+self.splitx+2,self.y+2,online and "D" or "R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
     b:moveadd(function(self,x,y)
@@ -509,7 +513,7 @@ new = function(x,y,w,h)
     box.list={}
     box.numlist = 0
     box.max_lines = math.floor(box.h/10)-1
-    box.max_text_width = math.floor(box.w*0.7)
+    box.max_text_width = math.floor(box.w*0.8)
     box.splitx=x+box.max_text_width
     box.scrollbar = ui_scrollbar.new(box.x2-2,box.y+11,box.h-12,0,box.max_lines)
     box.lines={
@@ -517,7 +521,6 @@ new = function(x,y,w,h)
         ui_line.new(box.x+22,box.y+10,box.x+22,box.y2-1,170,170,170),
         ui_line.new(box.splitx,box.y+10,box.splitx,box.y2-1,170,170,170),
         ui_line.new(box.splitx+9,box.y+10,box.splitx+9,box.y2-1,170,170,170),
-        ui_line.new(box.splitx+33,box.y+10,box.splitx+33,box.y2-1,170,170,170),
     }
     function box:updatescroll()
         self.scrollbar:update(self.numlist,self.max_lines)
@@ -534,7 +537,7 @@ new = function(x,y,w,h)
     end
     box:drawadd(function (self)
         tpt.drawtext(self.x+24,self.y+2,"Files in "..TPT_LUA_PATH.." folder")
-        tpt.drawtext(self.splitx+11,self.y+2,"Ver  Update")
+        tpt.drawtext(self.splitx+11,self.y+2,"Update")
         for i,line in ipairs(self.lines) do
             line:draw()
         end
@@ -549,7 +552,7 @@ new = function(x,y,w,h)
                 check:draw()
             end
         end
-        requiresrestart=restart
+        requiresrestart = restart and not online
     end)
     box:moveadd(function(self,x,y)
         for i,line in ipairs(self.lines) do
@@ -752,8 +755,8 @@ local function download_file(url)
     return data
 end
 --Downloads to a location
-local function download_script(url,location)
-    local file = download_file(url)
+local function download_script(ID,location)
+    local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID)
     if file then
         f=io.open(location,"w")
         f:write(file)
@@ -761,13 +764,6 @@ local function download_script(url,location)
         return true
     end
     return false
-end
-local function check_update(id)
-    local file = download_file(id)
-    if file then
-        local _,_,version,updateLink,changelog = file:find('^\n?(.-)\n(.-)\n(.-)\n?$')
-        return version,updateLink,changelog
-    end
 end
 --Restart exe (if named correctly)
 local function do_restart()
@@ -944,8 +940,8 @@ function ui_button.delete(self)
     if tpt.input("Delete File", "Delete "..self.t.text.."?", "yes", "no") == "yes" then
         local filepath = self.ID and localscripts[self.ID]["path"] or self.t.text
         fs.removeFile(TPT_LUA_PATH.."/"..filepath:gsub("\\","/"))
-        if running[filepath] then running[self.t.text] = nil end
-        if localscripts[filepath] then localscripts[filepath] = nil end
+        if running[filepath] then running[filepath] = nil end
+        if localscripts[self.ID] then localscripts[self.ID] = nil end
         save_last()
         ui_button.localview()
         load_filenames()
@@ -953,17 +949,11 @@ function ui_button.delete(self)
     end
 end
 function ui_button.scriptcheck(self)
-    if self.canupdate and not self.hasupdate then
-        local version,updateLink,changelog=check_update(self.checkLink)
-        if tonumber(version)>tonumber(self.curversion) then
-            MANAGER_PRINT("An update for "..self.filename.." is available! (v "..version..") Click Update",25,255,55)
-            MANAGER_PRINT(changelog,25,255,55)
-            self.updateLink=updateLink self.t.text="Update" self.hasupdate=true
-        else MANAGER_PRINT("v"..self.curversion.." is latest version") end
-    elseif self.hasupdate then
-        if download_script(self.updateLink,TPT_LUA_PATH..PATH_SEP..self.filename) then
-            MANAGER_PRINT("Downloaded update! Restart if it is running")
-            self.canupdate=false
+    if download_script(self.ID,TPT_LUA_PATH..PATH_SEP..localscripts[self.ID]["path"]) then
+        self.canupdate = false
+        localscripts[self.ID]["version"] = onlinescripts[self.ID]["version"]
+        if running[localscripts[self.ID]["path"]] then
+            do_restart()
         end
     end
 end
@@ -1045,8 +1035,13 @@ local function gen_buttons_online()
     for k,v in pairs(onlinescripts) do
         local check = mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
         check.ID = k
-        check.checkbut.curversion = v["version"]
-        check.checkbut.canupdate = true
+        check.checkbut.ID = k
+        if localscripts[check.ID] then
+            check.running = true
+            if tonumber(v["version"]) > tonumber(localscripts[check.ID]["version"]) then
+                check.checkbut.canupdate = true
+            end
+        end
     end
 end
 gen_buttons = function()
