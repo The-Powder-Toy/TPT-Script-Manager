@@ -146,6 +146,13 @@ local function load_last()
         local lines = f:read("*a")
         f:close()
         localscripts = readScriptInfo(lines)
+        for k,v in pairs(localscripts) do
+            if not v["ID"] or not v["name"] or not v["description"] or not v["path"] or not v["version"] then
+                localscripts[k] = nil
+            elseif not fs.exists(TPT_LUA_PATH.."/"..v["path"]:gsub("\\","/")) then
+                 localscripts[k] = nil
+            end
+        end
     end
 end
 load_last()
@@ -157,7 +164,7 @@ local function load_filenames()
         if not dirlist then return end
         for i,v in ipairs(dirlist) do
             local file = directory.."/"..v
-            if fs.isDirectory(file) then
+            if fs.isDirectory(file) and v ~= "downloaded" then
                 searchRecursive(file)
             elseif fs.isFile(file) then
                 if file:find("%.lua$") then
@@ -447,9 +454,15 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
         if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
+            local script
             if online and onlinescripts[self.ID]["description"] then
+                script = onlinescripts[self.ID]
+            elseif not online and localscripts[self.ID] then
+                script = localscripts[self.ID]
+            end
+            if script then
                 tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
-                tooltip:updatetooltip(onlinescripts[self.ID]["description"])
+                tooltip:updatetooltip(script["name"].." by "..script["author"].."\nVersion "..script["version"].."\n\n"..script["description"])
             end
             self.drawbackground=true
         else
@@ -468,7 +481,8 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
         tpt.drawrect(self.x+12,self.y+1,8,8)
         if self.almostselected then self.almostselected=false tpt.fillrect(self.x+12,self.y+1,8,8,150,150,150)
         elseif self.selected then tpt.fillrect(self.x+12,self.y+1,8,8) end
-        if running[self.t.text] then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
+        local filepath = self.ID and localscripts[self.ID] and localscripts[self.ID]["path"] or self.t.text
+        if running[filepath] then tpt.drawtext(self.x+self.splitx+2,self.y+2,"R") end
         if self.checkbut.canupdate then self.checkbut:draw() end
     end)
     b:moveadd(function(self,x,y)
@@ -527,8 +541,9 @@ new = function(x,y,w,h)
         self.scrollbar:draw()
         local restart = false
         for i,check in ipairs(self.list) do
-            if not check.selected and running[check.t.text] then
-                restart=true
+            local filepath = check.ID and localscripts[check.ID] and localscripts[check.ID]["path"] or check.t.text
+            if not check.selected and running[filepath] then
+                restart = true
             end
             if i>self.scrollbar.pos and i<=self.scrollbar.pos+self.max_lines then
                 check:draw()
@@ -648,7 +663,7 @@ local mainwindow = ui_window.new(50,50,525,300)
 mainwindow:setbackground(10,10,10,235) mainwindow.drawbackground=true
 mainwindow:add(ui_console.new(275,148,300,189),"menuconsole")
 mainwindow:add(ui_checkbox.new(50,80,225,257),"checkbox")
-tooltip = ui_tooltip.new(0,1,150,"")
+tooltip = ui_tooltip.new(0,1,250,"")
 
 --Some API functions you can call from other scripts
 --put 'using_manager=MANAGER_EXISTS' or similar in your scripts, using_manager will be true if the manager is active
@@ -864,17 +879,20 @@ function ui_button.donepressed(self)
     running = {}
     for i,but in ipairs(mainwindow.checkbox.list) do
         if but.selected then
+            local filepath = but.ID and localscripts[but.ID]["path"] or but.t.text
             if requiresrestart then
-                running[but.t.text] = true
-            elseif not running[but.t.text] then
-                local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..but.t.text)
-                if not status then
-                    MANAGER_PRINT(err,255,0,0)
-                    print(err)
-                    but.selected = false
-                else
-                    MANAGER_PRINT("Started "..but.t.text)
-                    running[but.t.text] = true
+                running[filepath] = true
+            else
+                if not running[filepath] then
+                    local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..filepath)
+                    if not status then
+                        MANAGER_PRINT(err,255,0,0)
+                        print(err)
+                        but.selected = false
+                    else
+                        MANAGER_PRINT("Started "..but.t.text)
+                        running[filepath] = true
+                    end
                 end
             end
         end
@@ -899,6 +917,7 @@ function ui_button.downloadpressed(self)
                 file:write(script)
                 file:close()
                 localscripts[butt.ID] = onlinescripts[butt.ID]
+                localscripts[butt.ID]["path"] = displayName
                 dofile(name)
             end
             local status,err = pcall(get_script, but)
@@ -923,9 +942,10 @@ end
 function ui_button.delete(self)
     --there is no tpt.confirm() yet
     if tpt.input("Delete File", "Delete "..self.t.text.."?", "yes", "no") == "yes" then
-        fs.removeFile(TPT_LUA_PATH.."/"..self.t.text:gsub("\\","/"))
-        if running[self.t.text] then running[self.t.text] = nil end
-        if localscripts[self.t.text] then localscripts[self.t.text] = nil end
+        local filepath = self.ID and localscripts[self.ID]["path"] or self.t.text
+        fs.removeFile(TPT_LUA_PATH.."/"..filepath:gsub("\\","/"))
+        if running[filepath] then running[self.t.text] = nil end
+        if localscripts[filepath] then localscripts[filepath] = nil end
         save_last()
         ui_button.localview()
         load_filenames()
@@ -1003,34 +1023,30 @@ mainwindow:add(tempbutton)
 sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 
 local function gen_buttons_local()
-    --remember if a script was running before reload
+    for k,v in pairs(localscripts) do
+        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v["name"])
+        check.ID = k
+        if running[v["path"]] then
+            check.running = true
+            check.selected = true
+        end
+    end
     for i=1,#filenames do
-        mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
-        if running[filenames[i]] then mainwindow.checkbox.list[i].running=true mainwindow.checkbox.list[i].selected=true end
-        local f = io.open(TPT_LUA_PATH..PATH_SEP..filenames[i])
-        if f then
-            local line = f:read("*l")
-            local count=0 --check first 5 lines of files for update
-            while line and count<5 do
-                count=count+1
-                local _,_,ver,link = line:find("^--VER (.*) UPDATE (.*)$")
-                if ver and link then mainwindow.checkbox.list[i].checkbut.canupdate=true mainwindow.checkbox.list[i].checkbut.curversion=ver mainwindow.checkbox.list[i].checkbut.checkLink=link end
-                line = f:read("*l")
-            end
-            f:close()
+        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
+        if running[filenames[i]] then
+            check.running = true
+            check.selected = true
         end
     end
 end
 local function gen_buttons_online()
     local list = download_file("http://starcatcher.us/scripts/main.lua")
     onlinescripts = readScriptInfo(list)
-    local count = 1
     for k,v in pairs(onlinescripts) do
-        mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
-        mainwindow.checkbox.list[count].ID = k
-        mainwindow.checkbox.list[count].checkbut.curversion = v["version"] or "1.00"
-        mainwindow.checkbox.list[count].checkbut.canupdate = true
-        count = count + 1
+        local check = mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
+        check.ID = k
+        check.checkbut.curversion = v["version"]
+        check.checkbut.canupdate = true
     end
 end
 gen_buttons = function()
