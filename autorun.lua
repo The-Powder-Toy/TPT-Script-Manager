@@ -779,7 +779,11 @@ local function do_restart()
 end
 --TPT interface
 local function step()
-    tpt.fillrect(-1,-1,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
+    if tpt.version.jacob1s_mod then
+        tpt.fillrect(0,0,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
+    else
+        tpt.fillrect(-1,-1,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
+    end
     mainwindow:draw()
     tpt.drawtext(280,140,"Console Output:")
     if requiresrestart then
