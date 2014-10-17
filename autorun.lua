@@ -1,9 +1,6 @@
-
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---VER 2.21 UPDATE http://pastebin.com/raw.php?i=FKxVYV01
- 
---Version 2.21
+--Version 3.0
  
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -12,6 +9,7 @@
 --prettier, organize code
  
 --CHANGES:
+--central script / update server at starcatcher.us / delete local scripts / lots of other things by jacob1 v3.0
 --Scan all subdirectories in scripts folder! v2.25
 --Remove step hooks, v87 fixes them
 --Socket is now default in v87+ , horray, everyone can now use update features without extra downloads.
@@ -26,7 +24,8 @@
 
 if not socket then error("TPT version not supported") end
 
-local VERSION = "2.21"
+local VERSION = "3.0"
+local scriptversion = 1
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
 local WINDOWS=true
@@ -44,8 +43,8 @@ local running = {}
 local requiresrestart=false
 local hidden_mode=true
 local online = false
-local updatecheckID = 'http://www.pastebin.com/raw.php?i=FKxVYV01'
-local fullupdateID = nil
+local first_online = true
+local updatetable --temporarily holds info on script manager updates
 local gen_buttons
 local sidebutton
 local download_file
@@ -148,10 +147,12 @@ local function load_last()
         f:close()
         localscripts = readScriptInfo(lines)
         for k,v in pairs(localscripts) do
-            if not v["ID"] or not v["name"] or not v["description"] or not v["path"] or not v["version"] then
-                localscripts[k] = nil
-            elseif not fs.exists(TPT_LUA_PATH.."/"..v["path"]:gsub("\\","/")) then
-                 localscripts[k] = nil
+            if k ~= 1 then
+                if not v["ID"] or not v["name"] or not v["description"] or not v["path"] or not v["version"] then
+                    localscripts[k] = nil
+                elseif not fs.exists(TPT_LUA_PATH.."/"..v["path"]:gsub("\\","/")) then
+                     localscripts[k] = nil
+                end
             end
         end
     end
@@ -756,7 +757,7 @@ local function download_file(url)
 end
 --Downloads to a location
 local function download_script(ID,location)
-    local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID)
+    local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID.."&ver="..scriptversion)
     if file then
         f=io.open(location,"w")
         f:write(file)
@@ -902,7 +903,7 @@ function ui_button.downloadpressed(self)
             --maybe do better display names later
             local displayName
             local function get_script(butt)
-                local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
+                local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID.."&ver="..scriptversion)
                 displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
                 local name = TPT_LUA_PATH..PATH_SEP..displayName
                 if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
@@ -957,21 +958,11 @@ function ui_button.scriptcheck(self)
         end
     end
 end
-function ui_button.checkupdate(self)
-    if not self.canupdate then
-        local version,updateLink,changelog=check_update(updatecheckID)
-        if tonumber(version)>tonumber(VERSION) then
-            MANAGER_PRINT("A script manager update is available! (v "..version..") Click UPDATE",25,255,55)
-            MANAGER_PRINT(changelog,25,255,55)
-            fullupdateID=updateLink
-            self.canupdate=true
-            self.t.text="UPDATE" self.w=40 self.x2=self.x2-36 self.t:setcolor(25,255,25)
-        else MANAGER_PRINT("v"..VERSION.." is latest version") end
-    else
-        fileSystem.move("autorun.lua", "autorunold.lua")
-        download_script(fullupdateID,'autorun.lua')
-        do_restart()
-    end
+function ui_button.doupdate(self)
+    fileSystem.move("autorun.lua", "autorunold.lua")
+    download_script(1, 'autorun.lua')
+    localscripts[1] = updatetable[1]
+    do_restart()
 end
 function ui_button.localview(self)
     if online then
@@ -1003,7 +994,6 @@ mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
 mainwindow:add(ui_button.new(278,67,40,10,ui_button.reloadpressed,"RELOAD"))
 mainwindow:add(ui_button.new(338,67,80,10,ui_button.changeexename,"Change exe name"))
 mainwindow:add(ui_button.new(438,67,52,10,ui_button.changedir,"Change dir"))
-mainwindow:add(ui_button.new(278,127,76,10,ui_button.checkupdate,"CHECK UPDATE"))
 local tempbutton = ui_button.new(60, 65, 30, 10, ui_button.localview, "Local")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
@@ -1030,7 +1020,7 @@ local function gen_buttons_local()
     end
 end
 local function gen_buttons_online()
-    local list = download_file("http://starcatcher.us/scripts/main.lua")
+    local list = download_file("http://starcatcher.us/scripts/main.lua?ver="..scriptversion)
     onlinescripts = readScriptInfo(list)
     for k,v in pairs(onlinescripts) do
         local check = mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
@@ -1041,6 +1031,19 @@ local function gen_buttons_online()
             if tonumber(v["version"]) > tonumber(localscripts[check.ID]["version"]) then
                 check.checkbut.canupdate = true
             end
+        end
+    end
+    if first_online then
+        first_online = false
+        local updateinfo = download_file("http://starcatcher.us/scripts/main.lua?info=1&ver="..scriptversion)
+        updatetable = readScriptInfo(updateinfo)
+        if not updatetable[1] then return end
+        if tonumber(updatetable[1].version) > scriptversion then
+            local updatebutton = ui_button.new(278,127,40,10,ui_button.doupdate,"UPDATE")
+            updatebutton.t:setcolor(25,255,25)
+            mainwindow:add(updatebutton)
+            MANAGER_PRINT("A script manager update is available! Click UPDATE",25,255,55)
+            MANAGER_PRINT(updatetable[1].changelog,25,255,55)
         end
     end
 end

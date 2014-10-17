@@ -2,5 +2,6 @@ Powder.exe
 powder.pref
 stdout.txt
 stderr.txt
+autorunold.lua
 
 scripts/*
