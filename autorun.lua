@@ -37,6 +37,7 @@ if os.getenv('HOME') then
     WINDOWS=false
 end
 local filenames = {}
+local num_files = 0 --downloaded scripts aren't stored in filenames
 local localscripts = {}
 local onlinescripts = {}
 local running = {}
@@ -757,7 +758,7 @@ local function download_file(url)
 end
 --Downloads to a location
 local function download_script(ID,location)
-    local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID.."&ver="..scriptversion)
+    local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID)
     if file then
         f=io.open(location,"w")
         f:write(file)
@@ -824,11 +825,11 @@ function ui_button.reloadpressed(self)
     load_filenames()
     gen_buttons()
     mainwindow.checkbox:updatescroll()
-    if #filenames == 0 then
+    if num_files == 0 then
         MANAGER_PRINT("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
         fs.makeDirectory(TPT_LUA_PATH)
     else
-        MANAGER_PRINT("Reloaded file list, found "..#filenames.." scripts")
+        MANAGER_PRINT("Reloaded file list, found "..num_files.." scripts")
     end
 end
 function ui_button.selectnone(self)
@@ -907,7 +908,7 @@ function ui_button.downloadpressed(self)
             --maybe do better display names later
             local displayName
             local function get_script(butt)
-                local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID.."&ver="..scriptversion)
+                local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
                 displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
                 local name = TPT_LUA_PATH..PATH_SEP..displayName
                 if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
@@ -1008,6 +1009,7 @@ mainwindow:add(tempbutton)
 sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 
 local function gen_buttons_local()
+    local count = 0
     for k,v in pairs(localscripts) do
         local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v["name"])
         check.ID = k
@@ -1015,6 +1017,7 @@ local function gen_buttons_local()
             check.running = true
             check.selected = true
         end
+        count = count + 1
     end
     for i=1,#filenames do
         local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
@@ -1023,9 +1026,10 @@ local function gen_buttons_local()
             check.selected = true
         end
     end
+    num_files = count + #filenames
 end
 local function gen_buttons_online()
-    local list = download_file("http://starcatcher.us/scripts/main.lua?ver="..scriptversion)
+    local list = download_file("http://starcatcher.us/scripts/main.lua")
     onlinescripts = readScriptInfo(list)
     for k,v in pairs(onlinescripts) do
         local check = mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
@@ -1040,7 +1044,7 @@ local function gen_buttons_online()
     end
     if first_online then
         first_online = false
-        local updateinfo = download_file("http://starcatcher.us/scripts/main.lua?info=1&ver="..scriptversion)
+        local updateinfo = download_file("http://starcatcher.us/scripts/main.lua?info=1")
         updatetable = readScriptInfo(updateinfo)
         if not updatetable[1] then return end
         if tonumber(updatetable[1].version) > scriptversion then
