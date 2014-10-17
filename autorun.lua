@@ -468,7 +468,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
             if tpt.mousey>=self.y and tpt.mousey<self.y2 then
                 if tpt.mousex < self.x2+9 and self.running then
                     tooltip:settooltip(online and "downloaded" or "running")
-                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
+                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
                     tooltip:settooltip(onlinescripts[self.ID]["changelog"])
                 end
             end
