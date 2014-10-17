@@ -858,6 +858,10 @@ function ui_button.changedir(self)
     ui_button.reloadpressed()
     save_last()
 end
+function ui_button.uploadscript(self)
+    local command = WINDOWS and "start" or "xdg-open"
+    os.execute(command.." http://starcatcher.us/scripts/paste.lua")
+end
 local lastpaused
 function ui_button.sidepressed(self)
     hidden_mode = not hidden_mode
@@ -992,8 +996,9 @@ nonebutton.drawbox = true
 mainwindow:add(nonebutton)
 mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
 mainwindow:add(ui_button.new(278,67,40,10,ui_button.reloadpressed,"RELOAD"))
-mainwindow:add(ui_button.new(338,67,80,10,ui_button.changeexename,"Change exe name"))
-mainwindow:add(ui_button.new(438,67,52,10,ui_button.changedir,"Change dir"))
+mainwindow:add(ui_button.new(333,67,80,10,ui_button.changeexename,"Change exe name"))
+mainwindow:add(ui_button.new(428,67,51,10,ui_button.changedir,"Change dir"))
+mainwindow:add(ui_button.new(493,67,68,10,ui_button.uploadscript,"Upload Script"))
 local tempbutton = ui_button.new(60, 65, 30, 10, ui_button.localview, "Local")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
