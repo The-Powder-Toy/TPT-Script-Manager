@@ -448,7 +448,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+24,y+2,splitx-24)
     b.selected=false
-    b.checkbut=ui_checkbox.up_button(x+splitx+9,y,33,10,ui_button.scriptcheck,"Update")
+    b.checkbut=ui_checkbox.up_button(x+splitx+9,y,33,9,ui_button.scriptcheck,"Update")
     b.canupdate = false
     b.drawbox=false
     b:setbackground(127,127,127,100)
@@ -466,9 +466,9 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
             self.drawbackground=true
         else
             if tpt.mousey>=self.y and tpt.mousey<self.y2 then
-                if tpt.mousex < self.x2+10 and self.running then
+                if tpt.mousex < self.x2+9 and self.running then
                     tooltip:settooltip(online and "downloaded" or "running")
-                elseif tpt.mousex > self.x2+33 and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
+                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
                     tooltip:settooltip(onlinescripts[self.ID]["changelog"])
                 end
             end
@@ -802,7 +802,7 @@ local function mouseclick(mousex,mousey,button,event,wheel)
     return false
 end
 local function keypress(key,nkey,modifier,event)
-    if nkey==27 then hidden_mode=true return false end
+    if nkey==27 and not hidden_mode then hidden_mode=true return false end
     if not hidden_mode then return false end
 end
 --small button on right to bring up main menu
