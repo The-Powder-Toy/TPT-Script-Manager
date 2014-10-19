@@ -882,7 +882,6 @@ end
 local donebutton
 function ui_button.donepressed(self)
     hidden_mode = true
-    running = {}
     for i,but in ipairs(mainwindow.checkbox.list) do
         if but.selected then
             local filepath = but.ID and localscripts[but.ID]["path"] or but.t.text
@@ -896,7 +895,7 @@ function ui_button.donepressed(self)
                         print(err)
                         but.selected = false
                     else
-                        MANAGER_PRINT("Started "..but.t.text)
+                        MANAGER_PRINT("Started "..filepath)
                         running[filepath] = true
                     end
                 end
