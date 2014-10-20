@@ -181,6 +181,7 @@ local function load_filenames()
         end
     end
     searchRecursive(TPT_LUA_PATH)
+    table.sort(filenames, function(first,second) return first:lower() < second:lower() end)
 end
 --ui object stuff
 local ui_base local ui_box local ui_line local ui_text local ui_button local ui_scrollbar local ui_tooltip local ui_checkbox local ui_console local ui_window
@@ -362,6 +363,7 @@ new = function(x,y,w,h,f,text)
     b.f=f
     b.t=ui_text.new(text,x+2,y+2)
     b.drawbox=false
+    b.clicked=false
     b.almostselected=false
     b.invert=true
     b:setbackground(127,127,127,125)
@@ -386,10 +388,16 @@ new = function(x,y,w,h,f,text)
         self.t:onmove(x,y)
     end)
     function b:process(mx,my,button,event,wheel)
+        local clicked = self.clicked
+        if event==2 then self.clicked = false end
         if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then return false end
-        if event==3 then self.almostselected=true end
-        if event==2 then self:f() end
-        return true
+        if event==1 then
+            self.clicked=true
+        elseif clicked then
+            if event==3 then self.almostselected=true end
+            if event==2 then self:f() end
+            return true
+        end
     end
     return b
 end
@@ -447,12 +455,14 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b.f=f b.f2=f2
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+24,y+2,splitx-24)
+    b.clicked=false
     b.selected=false
     b.checkbut=ui_checkbox.up_button(x+splitx+9,y,33,9,ui_button.scriptcheck,"Update")
     b.canupdate = false
     b.drawbox=false
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
+        if self.t.text == "" then return end
         if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
             local script
             if online and onlinescripts[self.ID]["description"] then
@@ -465,7 +475,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
             end
             self.drawbackground=true
         else
-            if tpt.mousey>=self.y and tpt.mousey<self.y2 then
+            if tpt.mousey>=self.y and tpt.mousey<self.y2 and tpt.mousex > self.x then
                 if tpt.mousex < self.x2+9 and self.running then
                     tooltip:settooltip(online and "downloaded" or "running")
                 elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
@@ -497,12 +507,20 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     end)
     function b:process(mx,my,button,event,wheel)
         if self.f2 and mx <= self.x+8 then
-            if event==3 then self.deletealmostselected = true end
-            if event==2 then self:f2() end
-        elseif mx<=self.x+self.splitx then
-            if event==3 then self.almostselected=true end
-            if event==2 then self:f() end
-            self.t:process(mx,my,button,event,wheel)
+            if event==1 then
+                self.clicked = 1
+            elseif self.clicked == 1 then
+                if event==3 then self.deletealmostselected = true end
+                if event==2 then self:f2() end
+            end
+        elseif self.f and mx<=self.x+self.splitx then
+            if event==1 then
+                self.clicked = 2
+            elseif self.clicked == 2 then
+                if event==3 then self.almostselected=true end
+                if event==2 then self:f() end
+                self.t:process(mx,my,button,event,wheel)
+            end
         else
             if self.checkbut.canupdate then self.checkbut:process(mx,my,button,event,wheel) end
         end
@@ -577,6 +595,9 @@ new = function(x,y,w,h)
         if scrolled then self:scroll(scrolled) end
         local which = math.floor((my-self.y-11)/10)+1
         if which>0 and which<=self.numlist then self.list[which+self.scrollbar.pos]:process(mx,my,button,event,wheel) end
+        if event == 2 then
+            for i,v in ipairs(self.list) do v.clicked = false end
+        end
         return true
     end
     return box
@@ -884,8 +905,8 @@ local donebutton
 function ui_button.donepressed(self)
     hidden_mode = true
     for i,but in ipairs(mainwindow.checkbox.list) do
+        local filepath = but.ID and localscripts[but.ID]["path"] or but.t.text
         if but.selected then
-            local filepath = but.ID and localscripts[but.ID]["path"] or but.t.text
             if requiresrestart then
                 running[filepath] = true
             else
@@ -901,6 +922,8 @@ function ui_button.donepressed(self)
                     end
                 end
             end
+        elseif running[filepath] then
+            running[filepath] = nil
         end
     end
     if requiresrestart then do_restart() return end
@@ -1014,14 +1037,20 @@ sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 
 local function gen_buttons_local()
     local count = 0
-    for k,v in pairs(localscripts) do
-        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v["name"])
-        check.ID = k
-        if running[v["path"]] then
+    local sorted = {}
+    for k,v in pairs(localscripts) do table.insert(sorted, v) end
+    table.sort(sorted, function(first,second) return first.name:lower() < second.name:lower() end) 
+    for i,v in ipairs(sorted) do
+        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v.name)
+        check.ID = v.ID
+        if running[v.path] then
             check.running = true
             check.selected = true
         end
         count = count + 1
+    end
+    if #sorted >= 5 and #filenames >= 5 then
+        mainwindow.checkbox:add(nil, nil, "") --empty space to separate things
     end
     for i=1,#filenames do
         local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
@@ -1035,13 +1064,16 @@ end
 local function gen_buttons_online()
     local list = download_file("http://starcatcher.us/scripts/main.lua")
     onlinescripts = readScriptInfo(list)
-    for k,v in pairs(onlinescripts) do
-        local check = mainwindow.checkbox:add(ui_button.pressed, nil, v["name"])
-        check.ID = k
-        check.checkbut.ID = k
-        if localscripts[check.ID] then
+    local sorted = {}
+    for k,v in pairs(onlinescripts) do table.insert(sorted, v) end
+    table.sort(sorted, function(first,second) return first.ID < second.ID end) 
+    for k,v in pairs(sorted) do
+        local check = mainwindow.checkbox:add(ui_button.pressed, nil, v.name)
+        check.ID = v.ID
+        check.checkbut.ID = v.ID
+        if localscripts[v.ID] then
             check.running = true
-            if tonumber(v["version"]) > tonumber(localscripts[check.ID]["version"]) then
+            if tonumber(v.version) > tonumber(localscripts[check.ID].version) then
                 check.checkbut.canupdate = true
             end
         end
