@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.0
+--Version 3.1
  
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -24,8 +24,8 @@
 
 if not socket then error("TPT version not supported") end
 
-local VERSION = "3.0"
-local scriptversion = 1
+local VERSION = "3.1"
+local scriptversion = 2
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
 local WINDOWS=true
@@ -347,7 +347,7 @@ new = function(x,y,h,t,m)
                 local previous = self.pos
                 self:move(wheel)
                 if self.pos~=previous then
-                    return wheel
+                    return previous-self.pos
                 end
             end
         end
@@ -428,7 +428,7 @@ new = function(x,y,w,text)
         self.drawbackground = tooltip ~= ""
     end
     function b:settooltip(tooltip_)
-        tooltip:onmove(tpt.mousex-tooltip.x, tpt.mousey-tooltip.y)
+        tooltip:onmove(tpt.mousex+5-tooltip.x, tpt.mousey+5-tooltip.y)
         tooltip:updatetooltip(tooltip_)
     end
     b:updatetooltip(text)
@@ -674,7 +674,7 @@ new = function(x,y,w,h)
         end
     end)
     function w:process(mx,my,button,event,wheel)
-        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then return false end
+        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then ui_button.sidepressed() return true end
         local ret
         for i,sub in ipairs(self.sub) do
             if sub:process(mx,my,button,event,wheel) then ret = true end
