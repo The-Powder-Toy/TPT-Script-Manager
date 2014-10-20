@@ -728,7 +728,8 @@ local function download_file(url)
     local succ=pcall(conn.connect,conn,host,80)
     conn:settimeout(5)
     if not succ then return end
-    succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\n\n")
+    local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(tpt.version.jacob1s_mod and "M1" or "M0")..") SCRIPT/"..VERSION
+    succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\n")
     if not succ then return end
     local data=""
     local c=""
