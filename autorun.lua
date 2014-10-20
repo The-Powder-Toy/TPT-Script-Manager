@@ -9,6 +9,7 @@
 --prettier, organize code
  
 --CHANGES:
+--Version 3.1: Organize scripts less randomly, fix scripts being run twice, fix other bugs
 --central script / update server at starcatcher.us / delete local scripts / lots of other things by jacob1 v3.0
 --Scan all subdirectories in scripts folder! v2.25
 --Remove step hooks, v87 fixes them
@@ -1038,8 +1039,8 @@ sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
 local function gen_buttons_local()
     local count = 0
     local sorted = {}
-    for k,v in pairs(localscripts) do table.insert(sorted, v) end
-    table.sort(sorted, function(first,second) return first.name:lower() < second.name:lower() end) 
+    for k,v in pairs(localscripts) do if v.ID ~=1 then table.insert(sorted, v) end end
+    table.sort(sorted, function(first,second) return first.name:lower() < second.name:lower() end)
     for i,v in ipairs(sorted) do
         local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v.name)
         check.ID = v.ID
