@@ -30,11 +30,19 @@ local scriptversion = 2
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
 local WINDOWS=true
+local jacobsmod = tpt.version.jacob1s_mod
 local EXE_NAME = "Powder.exe"
+if jacobsmod then
+    EXE_NAME = "Jacob1\'s\ Mod.exe"
+end
 local CHECKUPDATE = false
 if os.getenv('HOME') then
     PATH_SEP = '/'
-    EXE_NAME = "powder"
+    if jacobsmod then
+        EXE_NAME = "Jacob1\'s\ Mod"
+    else
+        EXE_NAME = "powder"
+    end
     WINDOWS=false
 end
 local filenames = {}
@@ -459,7 +467,6 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b.clicked=false
     b.selected=false
     b.checkbut=ui_checkbox.up_button(x+splitx+9,y,33,9,ui_button.scriptcheck,"Update")
-    b.canupdate = false
     b.drawbox=false
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
@@ -479,7 +486,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
             if tpt.mousey>=self.y and tpt.mousey<self.y2 and tpt.mousex > self.x then
                 if tpt.mousex < self.x2+9 and self.running then
                     tooltip:settooltip(online and "downloaded" or "running")
-                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
+                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.checkbut.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
                     tooltip:settooltip(onlinescripts[self.ID]["changelog"])
                 end
             end
@@ -750,7 +757,7 @@ local function download_file(url)
     local succ=pcall(conn.connect,conn,host,80)
     conn:settimeout(5)
     if not succ then return end
-    local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(tpt.version.jacob1s_mod and "M1" or "M0")..") SCRIPT/"..VERSION
+    local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(jacobsmod and "M1" or "M0")..") SCRIPT/"..VERSION
     succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\n")
     if not succ then return end
     local data=""
@@ -802,7 +809,7 @@ local function do_restart()
 end
 --TPT interface
 local function step()
-    if tpt.version.jacob1s_mod then
+    if jacobsmod then
         tpt.fillrect(0,0,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
     else
         tpt.fillrect(-1,-1,gfx.WIDTH,gfx.HEIGHT,0,0,0,150)
@@ -825,26 +832,26 @@ local function mouseclick(mousex,mousey,button,event,wheel)
     return false
 end
 local function keypress(key,nkey,modifier,event)
+	if jacobsmod and key == 'o' and event == 1 then if tpt.oldmenu()==0 then sidebutton:onmove(0, 256) else sidebutton:onmove(0, -256) end end
     if nkey==27 and not hidden_mode then hidden_mode=true return false end
     if not hidden_mode then return false end
 end
 --small button on right to bring up main menu
 local WHITE = {255,255,255,255}
 local BLACK = {0,0,0,255}
-local sidecoords = {612,134,16,17}
 local ICON = math.random(2) --pick a random icon
-local lua_letters= {{{615,136,615,141},{615,141,617,141},{619,141,619,145},{619,145,621,145},{621,141,621,145},{623,145,625,145},{623,145,623,149},{624,147,624,147},{625,145,625,149},},
-    {{615,137,615,147},{615,148,620,148},{617,137,617,146},{617,146,620,146},{620,137,620,146},{622,137,625,137},{622,137,622,148},{623,142,624,142},{625,137,625,148},}}
+local lua_letters= {{{2,2,2,7},{2,7,4,7},{6,7,6,11},{6,11,8,11},{8,7,8,11},{10,11,12,11},{10,11,10,15},{11,13,11,13},{12,11,12,15},},
+    {{2,3,2,13},{2,14,7,14},{4,3,4,12},{4,12,7,12},{7,3,7,12},{9,3,12,3},{9,3,9,14},{10,8,11,8},{12,3,12,14},}}
 local function smallstep()
-    tpt.drawrect(613,135,14,15,200,200,200)
+    gfx.drawRect(sidebutton.x, sidebutton.y+1, sidebutton.w+1, sidebutton.h+1,200,200,200)
     local color=WHITE
     if not hidden_mode then 
 		step()
-		tpt.fillrect(unpack(sidecoords))
+		gfx.fillRect(sidebutton.x, sidebutton.y+1, sidebutton.w+1, sidebutton.h+1)
 		color=BLACK
 	end
     for i,dline in ipairs(lua_letters[ICON]) do
-        tpt.drawline(dline[1],dline[2],dline[3],dline[4],color[1],color[2],color[3])
+        tpt.drawline(dline[1]+sidebutton.x,dline[2]+sidebutton.y,dline[3]+sidebutton.x,dline[4]+sidebutton.y,color[1],color[2],color[3])
     end
 end
 --button functions on click
@@ -988,12 +995,19 @@ function ui_button.scriptcheck(self)
         localscripts[self.ID]["version"] = onlinescripts[self.ID]["version"]
         if running[localscripts[self.ID]["path"]] then
             do_restart()
+        else
+            MANAGER_PRINT("Updated "..localscripts[self.ID]["name"])
         end
     end
 end
 function ui_button.doupdate(self)
-    fileSystem.move("autorun.lua", "autorunold.lua")
-    download_script(1, 'autorun.lua')
+    if jacobsmod > 30 then
+        fileSystem.move("scriptmanager.lua", "scriptmanagerold.lua")
+        download_script(1, 'scriptmanager.lua')
+    else
+        fileSystem.move("autorun.lua", "autorunold.lua")
+        download_script(1, 'autorun.lua')
+    end
     localscripts[1] = updatetable[1]
     do_restart()
 end
@@ -1035,11 +1049,14 @@ tempbutton = ui_button.new(100, 65, 35, 10, ui_button.onlineview, "Online")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
 sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
+if jacobsmod and tpt.oldmenu()==1 then
+	sidebutton:onmove(0, 256)
+end
 
 local function gen_buttons_local()
     local count = 0
     local sorted = {}
-    for k,v in pairs(localscripts) do if v.ID ~=1 then table.insert(sorted, v) end end
+    for k,v in pairs(localscripts) do if v.ID ~= 1 then table.insert(sorted, v) end end
     table.sort(sorted, function(first,second) return first.name:lower() < second.name:lower() end)
     for i,v in ipairs(sorted) do
         local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v.name)
