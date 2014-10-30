@@ -25,8 +25,9 @@
 
 if not socket then error("TPT version not supported") end
 
-local VERSION = "3.1"
 local scriptversion = 2
+MANAGER = {["version"] = "3.1", ["scriptversion"] = scriptversion, ["hidden"] = true}
+
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
 local WINDOWS=true
@@ -51,7 +52,6 @@ local localscripts = {}
 local onlinescripts = {}
 local running = {}
 local requiresrestart=false
-local hidden_mode=true
 local online = false
 local first_online = true
 local updatetable --temporarily holds info on script manager updates
@@ -351,7 +351,7 @@ new = function(x,y,h,t,m)
         if y then self.y=self.y+y end  
     end)
     function bar:process(mx,my,button,event,wheel)
-        if wheel~=0 and not hidden_mode then
+        if wheel~=0 and not MANAGER.hidden then
             if self.total > self.numshown then
                 local previous = self.pos
                 self:move(wheel)
@@ -700,31 +700,22 @@ mainwindow:add(ui_checkbox.new(50,80,225,257),"checkbox")
 tooltip = ui_tooltip.new(0,1,250,"")
 
 --Some API functions you can call from other scripts
---put 'using_manager=MANAGER_EXISTS' or similar in your scripts, using_manager will be true if the manager is active
-MANAGER_EXISTS = true
+--put 'using_manager=MANAGER ~= nil' or similar in your scripts, using_manager will be true if the manager is active
 --Print a message to the manager console, can be colored
-function MANAGER_PRINT(msg,...)
+function MANAGER.print(msg,...)
     mainwindow.menuconsole:addstr(msg,unpack(arg))
 end
---send version, for some compatibility
-function MANAGER_VERSION()
-    return VERSION
-end
 --downloads and returns a file, so you can do whatever...
-function MANAGER_DOWNLOAD(url)
+function MANAGER.download(url)
     return download_file(url)
 end
 --Get various info about the system (if on windows, script directory, path seperator, if socket is loaded)
-function MANAGER_SYSINFO()
-    return {["isWindows"]=WINDOWS,["scriptDir"]=TPT_LUA_PATH,["pathSep"]=PATH_SEP,["socket"]=true}
-end
---Get whether or not the manager window is hidden or not
-function MANAGER_HIDDEN()
-    return hidden_mode
+function MANAGER.sysinfo()
+    return {["isWindows"]=WINDOWS, ["scriptDir"]=TPT_LUA_PATH, ["pathSep"]=PATH_SEP, ["exeName"] = EXE_NAME}
 end
 --Save a setting in the autorun settings file, ident should be your script name no one else would use. 
 --Name is variable name, val is the value which will be saved/returned as a string
-function MANAGER_SAVESETTING(ident,name,val)
+function MANAGER.savesetting(ident,name,val)
     ident = tostring(ident)
     name = tostring(name)
     val = tostring(val)
@@ -733,31 +724,30 @@ function MANAGER_SAVESETTING(ident,name,val)
     save_last()
 end
 --Get a previously saved value, if it has one
-function MANAGER_GETSETTING(ident,name)
+function MANAGER.getsetting(ident,name)
     if settings[ident] then return settings[ident][name] end
     return nil
 end
 --delete a setting, leave name nil to delete all of ident
-function MANAGER_DELSETTING(ident,name)
+function MANAGER.delsetting(ident,name)
     if settings[ident] then 
 	if name then settings[ident][name]=nil
 	else settings[ident]=nil end
 	save_last()
     end
 end
---some other API functions here..
  
 --mniip's download thing (mostly)
 local pattern = "http://w*%.?(.-)(/.*)"
 local function download_file(url)
     local _,_,host,rest = url:find(pattern)
-    if not host or not rest then MANAGER_PRINT("Bad link") return end
+    if not host or not rest then MANAGER.print("Bad link") return end
     local conn=socket.tcp()
     if not conn then return end
     local succ=pcall(conn.connect,conn,host,80)
     conn:settimeout(5)
     if not succ then return end
-    local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(jacobsmod and "M1" or "M0")..") SCRIPT/"..VERSION
+    local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(jacobsmod and "M1" or "M0")..") SCRIPT/"..MANAGER.version
     succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\n")
     if not succ then return end
     local data=""
@@ -768,7 +758,7 @@ local function download_file(url)
             data=data.."\n"..c
         end
     end
-    if data=="" then MANAGER_PRINT("no data") return end
+    if data=="" then MANAGER.print("no data") return end
     local first,last,code = data:find("HTTP/1%.1 (.-) .-\n")
     while last do
         data = data:sub(last+1)
@@ -805,7 +795,7 @@ local function do_restart()
     else
         os.execute("killall -s KILL \""..EXE_NAME.."\" && ./\""..EXE_NAME.."\"")
     end
-    MANAGER_PRINT("Restart failed, do you have the exe name right?",255,0,0)
+    MANAGER.print("Restart failed, do you have the exe name right?",255,0,0)
 end
 --TPT interface
 local function step()
@@ -820,12 +810,12 @@ local function step()
         tpt.drawtext(280,88,"Disabling a script requires a restart for effect!",255,50,50)
     end
     tpt.drawtext(55,55,"Click a script to toggle, hit DONE when finished")
-    tpt.drawtext(474,55,"Script Manager v"..VERSION)--479 for simple versions
+    tpt.drawtext(474,55,"Script Manager v"..MANAGER.version)--479 for simple versions
     tooltip:draw()
 end
 local function mouseclick(mousex,mousey,button,event,wheel)
     sidebutton:process(mousex,mousey,button,event,wheel)
-    if hidden_mode then return true end
+    if MANAGER.hidden then return true end
    
     if mousex>612 or mousey>384 then return false end
     mainwindow:process(mousex,mousey,button,event,wheel)
@@ -833,8 +823,8 @@ local function mouseclick(mousex,mousey,button,event,wheel)
 end
 local function keypress(key,nkey,modifier,event)
 	if jacobsmod and key == 'o' and event == 1 then if tpt.oldmenu()==0 then sidebutton:onmove(0, 256) else sidebutton:onmove(0, -256) end end
-    if nkey==27 and not hidden_mode then hidden_mode=true return false end
-    if not hidden_mode then return false end
+    if nkey==27 and not MANAGER.hidden then MANAGER.hidden=true return false end
+    if not MANAGER.hidden then return false end
 end
 --small button on right to bring up main menu
 local WHITE = {255,255,255,255}
@@ -845,7 +835,7 @@ local lua_letters= {{{2,2,2,7},{2,7,4,7},{6,7,6,11},{6,11,8,11},{8,7,8,11},{10,1
 local function smallstep()
     gfx.drawRect(sidebutton.x, sidebutton.y+1, sidebutton.w+1, sidebutton.h+1,200,200,200)
     local color=WHITE
-    if not hidden_mode then 
+    if not MANAGER.hidden then 
 		step()
 		gfx.fillRect(sidebutton.x, sidebutton.y+1, sidebutton.w+1, sidebutton.h+1)
 		color=BLACK
@@ -860,10 +850,10 @@ function ui_button.reloadpressed(self)
     gen_buttons()
     mainwindow.checkbox:updatescroll()
     if num_files == 0 then
-        MANAGER_PRINT("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
+        MANAGER.print("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
         fs.makeDirectory(TPT_LUA_PATH)
     else
-        MANAGER_PRINT("Reloaded file list, found "..num_files.." scripts")
+        MANAGER.print("Reloaded file list, found "..num_files.." scripts")
     end
 end
 function ui_button.selectnone(self)
@@ -878,7 +868,7 @@ function ui_button.changeexename(self)
     local last = EXE_NAME
     local new = tpt.input("Change exe name","Enter the exact name of powder toy executable",EXE_NAME,EXE_NAME)
     if new~=last and new~="" then
-        MANAGER_PRINT("Executable name changed to "..new,255,255,0)
+        MANAGER.print("Executable name changed to "..new,255,255,0)
         EXE_NAME = new
     end
     save_last()
@@ -887,7 +877,7 @@ function ui_button.changedir(self)
     local last = TPT_LUA_PATH
     local new = tpt.input("Change search directory","Enter the folder where your scripts are",TPT_LUA_PATH,TPT_LUA_PATH)
     if new~=last and new~="" then
-        MANAGER_PRINT("Directory changed to "..new,255,255,0)
+        MANAGER.print("Directory changed to "..new,255,255,0)
         TPT_LUA_PATH = new
     end
     ui_button.reloadpressed()
@@ -899,9 +889,9 @@ function ui_button.uploadscript(self)
 end
 local lastpaused
 function ui_button.sidepressed(self)
-    hidden_mode = not hidden_mode
+    MANAGER.hidden = not MANAGER.hidden
     ui_button.localview()
-    if not hidden_mode then
+    if not MANAGER.hidden then
         lastpaused = tpt.set_pause()
         tpt.set_pause(1)
         ui_button.reloadpressed()
@@ -911,7 +901,7 @@ function ui_button.sidepressed(self)
 end
 local donebutton
 function ui_button.donepressed(self)
-    hidden_mode = true
+    MANAGER.hidden = true
     for i,but in ipairs(mainwindow.checkbox.list) do
         local filepath = but.ID and localscripts[but.ID]["path"] or but.t.text
         if but.selected then
@@ -921,11 +911,11 @@ function ui_button.donepressed(self)
                 if not running[filepath] then
                     local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..filepath)
                     if not status then
-                        MANAGER_PRINT(err,255,0,0)
+                        MANAGER.print(err,255,0,0)
                         print(err)
                         but.selected = false
                     else
-                        MANAGER_PRINT("Started "..filepath)
+                        MANAGER.print("Started "..filepath)
                         running[filepath] = true
                     end
                 end
@@ -959,16 +949,16 @@ function ui_button.downloadpressed(self)
             end
             local status,err = pcall(get_script, but)
             if not status then
-                MANAGER_PRINT(err,255,0,0)
+                MANAGER.print(err,255,0,0)
                 print(err)
                 but.selected = false
             else
-                MANAGER_PRINT("Downloaded and started "..but.t.text)
+                MANAGER.print("Downloaded and started "..but.t.text)
                 running[displayName] = true
             end
         end
     end
-    hidden_mode=true
+    MANAGER.hidden = true
     ui_button.localview()
     save_last()
 end
@@ -996,7 +986,7 @@ function ui_button.scriptcheck(self)
         if running[localscripts[self.ID]["path"]] then
             do_restart()
         else
-            MANAGER_PRINT("Updated "..localscripts[self.ID]["name"])
+            MANAGER.print("Updated "..localscripts[self.ID]["name"])
         end
     end
 end
@@ -1105,8 +1095,8 @@ local function gen_buttons_online()
             local updatebutton = ui_button.new(278,127,40,10,ui_button.doupdate,"UPDATE")
             updatebutton.t:setcolor(25,255,25)
             mainwindow:add(updatebutton)
-            MANAGER_PRINT("A script manager update is available! Click UPDATE",25,255,55)
-            MANAGER_PRINT(updatetable[1].changelog,25,255,55)
+            MANAGER.print("A script manager update is available! Click UPDATE",25,255,55)
+            MANAGER.print(updatetable[1].changelog,25,255,55)
         end
     end
 end
@@ -1128,7 +1118,7 @@ local started = ""
 for prev,v in pairs(running) do
     local status,err = pcall(dofile,TPT_LUA_PATH..PATH_SEP..prev)
     if not status then
-        MANAGER_PRINT(err,255,0,0)
+        MANAGER.print(err,255,0,0)
         running[prev] = nil
     else
         started=started.." "..prev
@@ -1138,7 +1128,7 @@ for prev,v in pairs(running) do
 end
 save_last()
 if started~="" then
-    MANAGER_PRINT("Auto started"..started)
+    MANAGER.print("Auto started"..started)
 end
 tpt.register_mouseevent(mouseclick)
 tpt.register_keypress(keypress)
