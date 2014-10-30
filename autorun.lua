@@ -889,6 +889,7 @@ function ui_button.uploadscript(self)
 end
 local lastpaused
 function ui_button.sidepressed(self)
+    if TPTMP and TPTMP.chatHidden == false then print("minimize TPTMP before opening the manager") return end
     MANAGER.hidden = not MANAGER.hidden
     ui_button.localview()
     if not MANAGER.hidden then
