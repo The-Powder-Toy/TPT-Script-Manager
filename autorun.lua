@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.1
+--Version 3.2
  
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
  
 --CHANGES:
+--Version 3.2: put MANAGER stuff in table, fix displaying changelogs
 --Version 3.1: Organize scripts less randomly, fix scripts being run twice, fix other bugs
 --central script / update server at starcatcher.us / delete local scripts / lots of other things by jacob1 v3.0
 --Scan all subdirectories in scripts folder! v2.25
@@ -25,8 +26,8 @@
 
 if not socket then error("TPT version not supported") end
 
-local scriptversion = 2
-MANAGER = {["version"] = "3.1", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 3
+MANAGER = {["version"] = "3.2", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
@@ -682,7 +683,7 @@ new = function(x,y,w,h)
         end
     end)
     function w:process(mx,my,button,event,wheel)
-        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then ui_button.sidepressed() return true end
+        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then if button == 0 then return end ui_button.sidepressed() return true end
         local ret
         for i,sub in ipairs(self.sub) do
             if sub:process(mx,my,button,event,wheel) then ret = true end
@@ -885,7 +886,7 @@ function ui_button.changedir(self)
 end
 function ui_button.uploadscript(self)
     local command = WINDOWS and "start" or "xdg-open"
-    os.execute(command.." http://starcatcher.us/scripts/paste.lua")
+    os.execute(command.." http://starcatcher.us/scripts/#submit-page")
 end
 local lastpaused
 function ui_button.sidepressed(self)
