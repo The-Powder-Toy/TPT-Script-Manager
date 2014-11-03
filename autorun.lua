@@ -93,12 +93,12 @@ end
 local function save_last()
     local savestring=""
     for script,v in pairs(running) do
-        savestring = savestring.." \'"..script.."\'"
+        savestring = savestring.." \""..script.."\""
     end
     savestring = "SAV "..savestring.."\nEXE "..EXE_NAME.."\nDIR "..TPT_LUA_PATH
     for k,t in pairs(settings) do
 	for n,v in pairs(t) do
-	    savestring = savestring.."\nSET "..k.." "..n..":'"..v.."'"	    
+	    savestring = savestring.."\nSET "..k.." "..n..":\""..v.."\""
 	end
     end
     local f
@@ -139,13 +139,13 @@ local function load_last()
             local tok=lines[i]:sub(1,3)
             local str=lines[i]:sub(5)
             if tok=="SAV" then
-                for word in string.gmatch(str, "\'(.-)\'") do running[word] = true end
+                for word in string.gmatch(str, "\"(.-)\"") do running[word] = true end
             elseif tok=="EXE" then
                 EXE_NAME=str
             elseif tok=="DIR" then
                 TPT_LUA_PATH=str
             elseif tok=="SET" then
-	        local ident,name,val = string.match(str,"(.-) (.-):\'(.-)\'")
+	        local ident,name,val = string.match(str,"(.-) (.-):\"(.-)\"")
 		if settings[ident] then settings[ident][name]=val
 		else settings[ident]={[name]=val} end
             end
@@ -945,6 +945,11 @@ function ui_button.downloadpressed(self)
                 if not file then error("could not open "..name) end
                 file:write(script)
                 file:close()
+                if localscripts[butt.ID] and localscripts[butt.ID]["path"] ~= displayName then
+                    local oldpath = localscripts[butt.ID]["path"]
+                    fs.removeFile(TPT_LUA_PATH.."/"..oldpath:gsub("\\","/"))
+                    running[oldpath] = nil
+                end
                 localscripts[butt.ID] = onlinescripts[butt.ID]
                 localscripts[butt.ID]["path"] = displayName
                 dofile(name)
@@ -982,13 +987,22 @@ function ui_button.delete(self)
     end
 end
 function ui_button.scriptcheck(self)
-    if download_script(self.ID,TPT_LUA_PATH..PATH_SEP..localscripts[self.ID]["path"]) then
+    local oldpath = localscripts[self.ID]["path"]
+    local newpath = "downloaded"..PATH_SEP..self.ID.." "..onlinescripts[self.ID].author.."-"..onlinescripts[self.ID].name..".lua"
+    if download_script(self.ID,TPT_LUA_PATH..PATH_SEP..newpath) then
         self.canupdate = false
-        localscripts[self.ID]["version"] = onlinescripts[self.ID]["version"]
-        if running[localscripts[self.ID]["path"]] then
+        localscripts[self.ID] = onlinescripts[self.ID]
+        localscripts[self.ID]["path"] = newpath
+        if oldpath ~= newpath then
+            fs.removeFile(TPT_LUA_PATH.."/"..oldpath:gsub("\\","/"))
+            if running[oldpath] then
+                running[newpath],running[oldpath] = running[oldpath],nil
+            end
+        end
+        if running[newpath] then
             do_restart()
         else
-            MANAGER.print("Updated "..localscripts[self.ID]["name"])
+            MANAGER.print("Updated "..onlinescripts[self.ID]["name"])
         end
     end
 end
