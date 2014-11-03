@@ -9,6 +9,7 @@
 --prettier, organize code
  
 --CHANGES:
+--Version 3.3: fix apostophes in filenames, allow authors to rename their scripts on the server
 --Version 3.2: put MANAGER stuff in table, fix displaying changelogs
 --Version 3.1: Organize scripts less randomly, fix scripts being run twice, fix other bugs
 --central script / update server at starcatcher.us / delete local scripts / lots of other things by jacob1 v3.0
@@ -26,8 +27,8 @@
 
 if not socket then error("TPT version not supported") end
 
-local scriptversion = 3
-MANAGER = {["version"] = "3.2", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 4
+MANAGER = {["version"] = "3.3", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
@@ -822,8 +823,9 @@ local function mouseclick(mousex,mousey,button,event,wheel)
     mainwindow:process(mousex,mousey,button,event,wheel)
     return false
 end
+local jacobsmod_old_menu_check = false
 local function keypress(key,nkey,modifier,event)
-	if jacobsmod and key == 'o' and event == 1 then if tpt.oldmenu()==0 then sidebutton:onmove(0, 256) else sidebutton:onmove(0, -256) end end
+	if jacobsmod and key == 'o' and event == 1 then jacobsmod_old_menu_check = true end
     if nkey==27 and not MANAGER.hidden then MANAGER.hidden=true return false end
     if not MANAGER.hidden then return false end
 end
@@ -843,6 +845,10 @@ local function smallstep()
 	end
     for i,dline in ipairs(lua_letters[ICON]) do
         tpt.drawline(dline[1]+sidebutton.x,dline[2]+sidebutton.y,dline[3]+sidebutton.x,dline[4]+sidebutton.y,color[1],color[2],color[3])
+    end
+    if jacobsmod_old_menu_check then
+        if tpt.oldmenu()==0 and sidebutton.y > 150 then sidebutton:onmove(0, -256) elseif tpt.oldmenu()==1 and sidebutton.y < 150 then sidebutton:onmove(0, 256) end
+        jacobsmod_old_menu_check = false
     end
 end
 --button functions on click
