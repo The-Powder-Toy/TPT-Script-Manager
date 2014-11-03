@@ -26,6 +26,10 @@
 --  The link at top downloads a file that contains ONLY version,full link,and prints the rest(changelog). See my link for example
 
 if not socket then error("TPT version not supported") end
+if MANAGER then error("manager is already running") end
+if tpt.version.jacob1s_mod == 30 and tpt.version.jacob1s_mod_minor == 0 then
+	return
+end
 
 local scriptversion = 4
 MANAGER = {["version"] = "3.3", ["scriptversion"] = scriptversion, ["hidden"] = true}
@@ -600,7 +604,7 @@ new = function(x,y,w,h)
         end
     end
     function box:process(mx,my,button,event,wheel)
-        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then return false end
+        if mx<self.x or mx>self.x2 or my<self.y or my>self.y2-7 then return false end
         local scrolled = self.scrollbar:process(mx,my,button,event,wheel)
         if scrolled then self:scroll(scrolled) end
         local which = math.floor((my-self.y-11)/10)+1
@@ -1013,7 +1017,7 @@ function ui_button.scriptcheck(self)
     end
 end
 function ui_button.doupdate(self)
-    if jacobsmod > 30 then
+    if jacobsmod and jacobsmod >= 30 then
         fileSystem.move("scriptmanager.lua", "scriptmanagerold.lua")
         download_script(1, 'scriptmanager.lua')
     else
