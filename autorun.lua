@@ -126,6 +126,24 @@ local function save_last()
     end
 end
 
+local function load_downloaded()
+    local f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo","r")
+    if f then
+        local lines = f:read("*a")
+        f:close()
+        localscripts = readScriptInfo(lines)
+        for k,v in pairs(localscripts) do
+            if k ~= 1 then
+                if not v["ID"] or not v["name"] or not v["description"] or not v["path"] or not v["version"] then
+                    localscripts[k] = nil
+                elseif not fs.exists(TPT_LUA_PATH.."/"..v["path"]:gsub("\\","/")) then
+                     localscripts[k] = nil
+                end
+            end
+        end
+    end
+end
+
 --load settings before anything else
 local function load_last()
     local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt","r")
@@ -157,21 +175,7 @@ local function load_last()
         end
     end
 
-    f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo","r")
-    if f then
-        local lines = f:read("*a")
-        f:close()
-        localscripts = readScriptInfo(lines)
-        for k,v in pairs(localscripts) do
-            if k ~= 1 then
-                if not v["ID"] or not v["name"] or not v["description"] or not v["path"] or not v["version"] then
-                    localscripts[k] = nil
-                elseif not fs.exists(TPT_LUA_PATH.."/"..v["path"]:gsub("\\","/")) then
-                     localscripts[k] = nil
-                end
-            end
-        end
-    end
+    load_downloaded()
 end
 load_last()
 --get list of files in scripts folder
@@ -858,6 +862,7 @@ end
 --button functions on click
 function ui_button.reloadpressed(self)
     load_filenames()
+    load_downloaded()
     gen_buttons()
     mainwindow.checkbox:updatescroll()
     if num_files == 0 then
@@ -888,6 +893,7 @@ function ui_button.changedir(self)
     local last = TPT_LUA_PATH
     local new = tpt.input("Change search directory","Enter the folder where your scripts are",TPT_LUA_PATH,TPT_LUA_PATH)
     if new~=last and new~="" then
+        fs.removeFile(last..PATH_SEP.."autorunsettings.txt")
         MANAGER.print("Directory changed to "..new,255,255,0)
         TPT_LUA_PATH = new
     end
