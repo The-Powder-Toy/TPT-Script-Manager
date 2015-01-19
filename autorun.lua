@@ -427,20 +427,30 @@ new = function(x,y,w,text)
     function b:updatetooltip(tooltip)
         self.tooltip = tooltip
         self.length = #tooltip
-        self.lines = 0
-        local start,last = 1,2
-        while last <= self.length do
-            while tpt.textwidth(self.tooltip:sub(start,last)) < w and last <= self.length and self.tooltip:sub(last,last) ~= '\n' do
-                last = last + 1
+        self.lines = 1
+
+        local linebreak,lastspace = 0,nil
+        for i=0,#self.tooltip do
+            local width = tpt.textwidth(tooltip:sub(linebreak,i+1))
+            if width > self.w/2 and tooltip:sub(i,i):match("[%s,_%.%-?!]") then
+                lastspace = i
             end
-            if last <= self.length and self.tooltip:sub(last,last) ~= '\n' then
-                self.length = self.length + 1
-                self.tooltip = self.tooltip:sub(1,last-1).."\n"..self.tooltip:sub(last)
+            local isnewline = (self.tooltip:sub(i,i) == '\n')
+            if width > self.w or isnewline then
+                local pos = (i==#tooltip or not lastspace) and i or lastspace
+                self.lines = self.lines + 1
+                if self.tooltip:sub(pos,pos) == ' ' then
+                    self.tooltip = self.tooltip:sub(1,pos-1).."\n"..self.tooltip:sub(pos+1)
+                elseif not isnewline then
+                    self.length = self.length + 1
+                    self.tooltip = self.tooltip:sub(1,pos-1).."\n"..self.tooltip:sub(pos)
+                    i = i + 1
+                    pos = pos + 1
+                end
+                linebreak = pos+1
+                lastspace = nil
             end
-            last = last + 1
-            start = last
-            self.lines = self.lines + 1
-	    end
+        end
         self.h = self.lines*12+2
         --if self.lines == 1 then self.w = tpt.textwidth(self.tooltip)+3 end
         self.drawbox = tooltip ~= ""
