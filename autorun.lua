@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.2
+--Version 3.3
  
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -75,7 +75,7 @@ local function scriptInfoString(info)
     for k,v in pairs(info) do
         table.insert(t,k..":\""..v.."\"")
     end
-    local rstr = table.concat(t,","):gsub("\n","\\n")
+    local rstr = table.concat(t,","):gsub("\r",""):gsub("\n","\\n")
     return rstr
 end
 
@@ -87,7 +87,7 @@ local function readScriptInfo(list)
         local t = {}
         local ID = 0
         for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
-            t[k]= tonumber(v) or v:gsub("\\n","\n")
+            t[k]= tonumber(v) or v:gsub("\r",""):gsub("\\n","\n")
         end
         scriptlist[t.ID] = t
     end
@@ -136,7 +136,7 @@ local function load_last()
         local lines = {}
         local line = f:read("*l")
         while line do
-            table.insert(lines,line)
+            table.insert(lines,(line:gsub("\r","")))
             line = f:read("*l")
         end
         f:close()
@@ -150,9 +150,9 @@ local function load_last()
             elseif tok=="DIR" then
                 TPT_LUA_PATH=str
             elseif tok=="SET" then
-	        local ident,name,val = string.match(str,"(.-) (.-):\"(.-)\"")
-		if settings[ident] then settings[ident][name]=val
-		else settings[ident]={[name]=val} end
+	            local ident,name,val = string.match(str,"(.-) (.-):\"(.-)\"")
+                if settings[ident] then settings[ident][name]=val
+                else settings[ident]={[name]=val} end
             end
         end
     end
