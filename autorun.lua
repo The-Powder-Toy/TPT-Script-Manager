@@ -921,7 +921,11 @@ function ui_button.changedir(self)
 end
 function ui_button.uploadscript(self)
 	local command = WINDOWS and "start" or "xdg-open"
-	os.execute(command.." http://starcatcher.us/scripts/#submit-page")
+	if online then
+		os.execute(command.." http://starcatcher.us/scripts/#submit-page")
+	else
+		os.execute(command.." "..TPT_LUA_PATH)
+	end
 end
 local lastpaused
 function ui_button.sidepressed(self)
@@ -1056,6 +1060,7 @@ function ui_button.doupdate(self)
 	localscripts[1] = updatetable[1]
 	do_restart()
 end
+local uploadscriptbutton
 function ui_button.localview(self)
 	if online then
 		online = false
@@ -1063,6 +1068,7 @@ function ui_button.localview(self)
 		donebutton.t.text = "DONE"
 		donebutton.w = 29 donebutton.x2 = donebutton.x + donebutton.w
 		donebutton.f = ui_button.donepressed
+		uploadscriptbutton.t.text = "\147 Script Folder"
 	end
 end
 function ui_button.onlineview(self)
@@ -1072,6 +1078,7 @@ function ui_button.onlineview(self)
 		donebutton.t.text = "DOWNLOAD"
 		donebutton.w = 55 donebutton.x2 = donebutton.x + donebutton.w
 		donebutton.f = ui_button.downloadpressed
+		uploadscriptbutton.t.text = "Upload Script"
 	end
 end
 --add buttons to window
@@ -1083,10 +1090,11 @@ local nonebutton = ui_button.new(62,81,8,8,ui_button.selectnone,"")
 nonebutton.drawbox = true
 mainwindow:add(nonebutton)
 mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
-mainwindow:add(ui_button.new(278,67,40,10,ui_button.reloadpressed,"RELOAD"))
-mainwindow:add(ui_button.new(333,67,80,10,ui_button.changeexename,"Change exe name"))
+mainwindow:add(ui_button.new(278,67,39,10,ui_button.reloadpressed,"RELOAD"))
+mainwindow:add(ui_button.new(333,67,79,10,ui_button.changeexename,"Change exe name"))
 mainwindow:add(ui_button.new(428,67,51,10,ui_button.changedir,"Change dir"))
-mainwindow:add(ui_button.new(493,67,68,10,ui_button.uploadscript,"Upload Script"))
+uploadscriptbutton = ui_button.new(493,67,79,10,ui_button.uploadscript,"\147 Script Folder")
+mainwindow:add(uploadscriptbutton)
 local tempbutton = ui_button.new(60, 65, 30, 10, ui_button.localview, "Local")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
