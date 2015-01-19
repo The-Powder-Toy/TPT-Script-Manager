@@ -735,8 +735,18 @@ function MANAGER.print(msg,...)
 	mainwindow.menuconsole:addstr(msg,unpack(arg))
 end
 --downloads and returns a file, so you can do whatever...
+local download_file
 function MANAGER.download(url)
 	return download_file(url)
+end
+function MANAGER.scriptinfo(id)
+	local url = "http://starcatcher.us/scripts/main.lua"
+	if id then
+		url = url.."?info="..id
+	end
+	local info = download_file(url)
+	infotable = readScriptInfo(info)
+	return id and infotable[id] or infotable
 end
 --Get various info about the system (if on windows, script directory, path seperator, if socket is loaded)
 function MANAGER.sysinfo()
@@ -768,7 +778,7 @@ end
 
 --mniip's download thing (mostly)
 local pattern = "http://w*%.?(.-)(/.*)"
-local function download_file(url)
+function download_file(url)
 	local _,_,host,rest = url:find(pattern)
 	if not host or not rest then MANAGER.print("Bad link") return end
 	local conn=socket.tcp()
