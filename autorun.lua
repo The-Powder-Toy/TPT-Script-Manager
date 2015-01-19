@@ -452,7 +452,7 @@ new = function(x,y,w,text)
             end
         end
         self.h = self.lines*12+2
-        --if self.lines == 1 then self.w = tpt.textwidth(self.tooltip)+3 end
+        --self.w = tpt.textwidth(self.tooltip)+3
         self.drawbox = tooltip ~= ""
         self.drawbackground = tooltip ~= ""
     end
@@ -479,9 +479,10 @@ up_button = function(x,y,w,h,f,text)
     b.canupdate=false
     return b
 end,
-new_button = function(x,y,w,h,splitx,f,f2,text)
+new_button = function(x,y,w,h,splitx,f,f2,text,localscript)
     local b = ui_box.new(x,y,splitx,h)
     b.f=f b.f2=f2
+    b.localscript=localscript
     b.splitx = splitx
     b.t=ui_text.newscroll(text,x+24,y+2,splitx-24)
     b.clicked=false
@@ -491,29 +492,35 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
     b:setbackground(127,127,127,100)
     b:drawadd(function(self)
         if self.t.text == "" then return end
-        if tpt.mousex>=self.x and tpt.mousex<self.x2 and tpt.mousey>=self.y and tpt.mousey<self.y2 then
-            local script
-            if online and onlinescripts[self.ID]["description"] then
-                script = onlinescripts[self.ID]
-            elseif not online and localscripts[self.ID] then
-                script = localscripts[self.ID]
-            end
-            if script then
-                tooltip:settooltip(script["name"].." by "..script["author"].."\n\n"..script["description"])
-            end
-            self.drawbackground=true
-        else
-            if tpt.mousey>=self.y and tpt.mousey<self.y2 and tpt.mousex > self.x then
-                if tpt.mousex < self.x2+9 and self.running then
-                    tooltip:settooltip(online and "downloaded" or "running")
-                elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.checkbut.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
-                    tooltip:settooltip(onlinescripts[self.ID]["changelog"])
+        self.drawbackground = false
+		if tpt.mousey >= self.y and tpt.mousey < self.y2 then
+			if tpt.mousex >= self.x and tpt.mousex < self.x+8 then
+                if self.localscript then
+                    tooltip:settooltip("delete this script")
+                else
+                    tooltip:settooltip("view script in browser")
                 end
-            end
-            self.drawbackground=false
-        end
+		    elseif tpt.mousex>=self.x and tpt.mousex<self.x2 then
+		        local script
+		        if online and onlinescripts[self.ID]["description"] then
+		            script = onlinescripts[self.ID]
+		        elseif not online and localscripts[self.ID] then
+		            script = localscripts[self.ID]
+		        end
+		        if script then
+		            tooltip:settooltip(script["name"].." by "..script["author"].."\n\n"..script["description"])
+		        end
+		        self.drawbackground = true
+		    elseif tpt.mousex >= self.x2 then
+		        if tpt.mousex < self.x2+9 and self.running then
+		            tooltip:settooltip(online and "downloaded" or "running")
+		        elseif tpt.mousex >= self.x2+9 and tpt.mousex < self.x2+43 and self.checkbut.canupdate and onlinescripts[self.ID] and onlinescripts[self.ID]["changelog"] then
+                    tooltip:settooltip(onlinescripts[self.ID]["changelog"])
+		        end
+		    end
+		end
         self.t:draw()
-        if self.f2 then
+        if self.localscript then
             if self.deletealmostselected then
                 self.deletealmostselected = false
                 tpt.drawtext(self.x+1, self.y+1, "\134", 255, 48, 32, 255)
@@ -521,7 +528,9 @@ new_button = function(x,y,w,h,splitx,f,f2,text)
                 tpt.drawtext(self.x+1, self.y+1, "\134", 160, 48, 32, 255)
             end
             tpt.drawtext(self.x+1, self.y+1, "\133", 255, 255, 255, 255)
-        end
+        else
+			tpt.drawtext(self.x+1, self.y+1, "\147", 255, 200, 80, 255)
+		end
         tpt.drawrect(self.x+12,self.y+1,8,8)
         if self.almostselected then self.almostselected=false tpt.fillrect(self.x+12,self.y+1,8,8,150,150,150)
         elseif self.selected then tpt.fillrect(self.x+12,self.y+1,8,8) end
@@ -577,8 +586,8 @@ new = function(x,y,w,h)
         self.list={}
         self.numlist=0
     end
-    function box:add(f,f2,text)
-        local but = ui_checkbox.new_button(self.x,self.y+1+((self.numlist+1)*10),tpt.textwidth(text)+4,10,self.max_text_width,f,f2,text)
+    function box:add(f,f2,text,localscript)
+        local but = ui_checkbox.new_button(self.x,self.y+1+((self.numlist+1)*10),tpt.textwidth(text)+4,10,self.max_text_width,f,f2,text,localscript)
         table.insert(self.list,but)
         self.numlist = #self.list
         return but
@@ -1012,6 +1021,10 @@ function ui_button.delete(self)
         gen_buttons()
     end
 end
+function ui_button.viewonline(self)
+    local command = WINDOWS and "start" or "xdg-open"
+    os.execute(command.." http://starcatcher.us/scripts/#"..self.ID)
+end
 function ui_button.scriptcheck(self)
     local oldpath = localscripts[self.ID]["path"]
     local newpath = "downloaded"..PATH_SEP..self.ID.." "..onlinescripts[self.ID].author.."-"..onlinescripts[self.ID].name..".lua"
@@ -1091,7 +1104,7 @@ local function gen_buttons_local()
     for k,v in pairs(localscripts) do if v.ID ~= 1 then table.insert(sorted, v) end end
     table.sort(sorted, function(first,second) return first.name:lower() < second.name:lower() end)
     for i,v in ipairs(sorted) do
-        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v.name)
+        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,v.name,true)
         check.ID = v.ID
         if running[v.path] then
             check.running = true
@@ -1100,10 +1113,10 @@ local function gen_buttons_local()
         count = count + 1
     end
     if #sorted >= 5 and #filenames >= 5 then
-        mainwindow.checkbox:add(nil, nil, "") --empty space to separate things
+        mainwindow.checkbox:add(nil, nil, "", false) --empty space to separate things
     end
     for i=1,#filenames do
-        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i])
+        local check = mainwindow.checkbox:add(ui_button.pressed,ui_button.delete,filenames[i],true)
         if running[filenames[i]] then
             check.running = true
             check.selected = true
@@ -1118,7 +1131,7 @@ local function gen_buttons_online()
     for k,v in pairs(onlinescripts) do table.insert(sorted, v) end
     table.sort(sorted, function(first,second) return first.ID < second.ID end) 
     for k,v in pairs(sorted) do
-        local check = mainwindow.checkbox:add(ui_button.pressed, nil, v.name)
+        local check = mainwindow.checkbox:add(ui_button.pressed, ui_button.viewonline, v.name, false)
         check.ID = v.ID
         check.checkbut.ID = v.ID
         if localscripts[v.ID] then
@@ -1164,7 +1177,7 @@ for prev,v in pairs(running) do
         running[prev] = nil
     else
         started=started.." "..prev
-        local newbut = mainwindow.checkbox:add(ui_button.pressed,prev)
+        local newbut = mainwindow.checkbox:add(ui_button.pressed,prev,nil,false)
         newbut.selected=true
     end
 end
