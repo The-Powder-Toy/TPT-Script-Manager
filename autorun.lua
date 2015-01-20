@@ -9,7 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
---Version 3.4: some new buttons, better tooltips, and fix 'Change dir' button
+--Version 3.4: some new buttons, better tooltips, fix 'Change dir' button, fix broken buttons on OS X
 --Version 3.3: fix apostophes in filenames, allow authors to rename their scripts on the server
 --Version 3.2: put MANAGER stuff in table, fix displaying changelogs
 --Version 3.1: Organize scripts less randomly, fix scripts being run twice, fix other bugs
@@ -32,26 +32,29 @@ if tpt.version.jacob1s_mod == 30 and tpt.version.jacob1s_mod_minor == 0 then
 	return
 end
 
-local scriptversion = 5
+local scriptversion = 6
 MANAGER = {["version"] = "3.4", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
-local WINDOWS=true
+local OS = "Windows"
 local jacobsmod = tpt.version.jacob1s_mod
-local EXE_NAME = "Powder.exe"
-if jacobsmod then
-	EXE_NAME = "Jacob1\'s\ Mod.exe"
-end
 local CHECKUPDATE = false
 if os.getenv('HOME') then
 	PATH_SEP = '/'
-	if jacobsmod then
-		EXE_NAME = "Jacob1\'s\ Mod"
+	if fs.exists("/Applications") then
+		OS = "OSX"
 	else
-		EXE_NAME = "powder"
+		OS = "Linux"
 	end
-	WINDOWS=false
+end
+local EXE_NAME
+if OS == "Windows" then
+	EXE_NAME = jacobsmod and "Jacob1\'s\ Mod.exe" or "Powder.exe"
+elseif OS == "Linux" then
+	EXE_NAME = jacobsmod and "Jacob1\'s\ Mod" or "powder"
+elseif OS == "OSX" then
+	EXE_NAME = "powder-x" --can't restart on OS X
 end
 local filenames = {}
 local num_files = 0 --downloaded scripts aren't stored in filenames
@@ -192,7 +195,7 @@ local function load_filenames()
 			elseif fs.isFile(file) then
 				if file:find("%.lua$") then
 					local toinsert = file:sub(#TPT_LUA_PATH+2)
-					if WINDOWS then
+					if OS == "Windows" then
 						toinsert = toinsert:gsub("/", "\\") --not actually required
 					end
 					table.insert(filenames, toinsert)
@@ -749,9 +752,9 @@ function MANAGER.scriptinfo(id)
 	infotable = readScriptInfo(info)
 	return id and infotable[id] or infotable
 end
---Get various info about the system (if on windows, script directory, path seperator, if socket is loaded)
+--Get various info about the system (operating system, script directory, path seperator, if socket is loaded)
 function MANAGER.sysinfo()
-	return {["isWindows"]=WINDOWS, ["scriptDir"]=TPT_LUA_PATH, ["pathSep"]=PATH_SEP, ["exeName"] = EXE_NAME}
+	return {["OS"]=OS, ["scriptDir"]=TPT_LUA_PATH, ["pathSep"]=PATH_SEP, ["exeName"] = EXE_NAME}
 end
 --Save a setting in the autorun settings file, ident should be your script name no one else would use.
 --Name is variable name, val is the value which will be saved/returned as a string
@@ -787,7 +790,7 @@ function download_file(url)
 	local succ=pcall(conn.connect,conn,host,80)
 	conn:settimeout(5)
 	if not succ then return end
-	local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(WINDOWS and "WIN; " or "LIN; ")..(jacobsmod and "M1" or "M0")..") SCRIPT/"..MANAGER.version
+	local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..(OS == "Windows" and "WIN; " or (os == "Linux" and "LIN; " or "OSX; "))..(jacobsmod and "M1" or "M0")..") SCRIPT/"..MANAGER.version
 	succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\n")
 	if not succ then return end
 	local data=""
@@ -830,10 +833,13 @@ end
 --Restart exe (if named correctly)
 local function do_restart()
 	save_last()
-	if WINDOWS then
+	if OS == "Windows" then
 		os.execute("TASKKILL /IM \""..EXE_NAME.."\" /F &&START .\\\""..EXE_NAME.."\"")
-	else
+	elseif OS == "Linux" then
 		os.execute("killall -s KILL \""..EXE_NAME.."\" && ./\""..EXE_NAME.."\"")
+	elseif OS == "OSX" then
+		MANAGER.print("Can't restart TPT on OS X, please close and reopen The Powder Toy")
+		return
 	end
 	MANAGER.print("Restart failed, do you have the exe name right?",255,0,0)
 end
@@ -931,7 +937,7 @@ function ui_button.changedir(self)
 	save_last()
 end
 function ui_button.uploadscript(self)
-	local command = WINDOWS and "start" or "xdg-open"
+	local command = OS == "Windows" and "start" or (OS == "Linux" and "xdg-open" or "open")
 	if online then
 		os.execute(command.." http://starcatcher.us/scripts/#submit-page")
 	else
@@ -1037,7 +1043,7 @@ function ui_button.delete(self)
 	end
 end
 function ui_button.viewonline(self)
-	local command = WINDOWS and "start" or "xdg-open"
+	local command = OS == "Windows" and "start" or (OS == "Linux" and "xdg-open" or "open")
 	os.execute(command.." http://starcatcher.us/scripts/#"..self.ID)
 end
 function ui_button.scriptcheck(self)
