@@ -50,9 +50,9 @@ if os.getenv('HOME') then
 end
 local EXE_NAME
 if OS == "Windows" then
-	EXE_NAME = jacobsmod and "Jacob1\'s\ Mod.exe" or "Powder.exe"
+	EXE_NAME = jacobsmod and "Jacob1\'s Mod.exe" or "Powder.exe"
 elseif OS == "Linux" then
-	EXE_NAME = jacobsmod and "Jacob1\'s\ Mod" or "powder"
+	EXE_NAME = jacobsmod and "Jacob1\'s Mod" or "powder"
 elseif OS == "OSX" then
 	EXE_NAME = "powder-x" --can't restart on OS X
 end
@@ -219,7 +219,7 @@ new = function()
 	function b:draw(...)
 		for _,f in ipairs(self.drawlist) do
 			if type(f)=="function" then
-				f(self,unpack(arg))
+				f(self,...)
 			end
 		end
 	end
@@ -736,7 +736,7 @@ tooltip = ui_tooltip.new(0,1,250,"")
 --put 'using_manager=MANAGER ~= nil' or similar in your scripts, using_manager will be true if the manager is active
 --Print a message to the manager console, can be colored
 function MANAGER.print(msg,...)
-	mainwindow.menuconsole:addstr(msg,unpack(arg))
+	mainwindow.menuconsole:addstr(msg,...)
 end
 --downloads and returns a file, so you can do whatever...
 local download_file
