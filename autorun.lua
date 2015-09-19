@@ -892,7 +892,16 @@ local jacobsmod_old_menu_check = false
 local function keypress(key,nkey,modifier,event)
 	if jacobsmod and key == 'o' and event == 1 then jacobsmod_old_menu_check = true end
 	if nkey==27 and not MANAGER.hidden then MANAGER.hidden=true return false end
-	if not MANAGER.hidden then return false end
+	if MANAGER.hidden then return end
+
+	if event == 1 then
+		if key == "[" then
+			mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, 1)
+		elseif key == "]" then
+			mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, -1)
+		end
+	end
+	return false
 end
 --small button on right to bring up main menu
 local WHITE = {255,255,255,255}
@@ -1129,7 +1138,7 @@ mainwindow:add(tempbutton)
 tempbutton = ui_button.new(100, 65, 35, 10, ui_button.onlineview, "Online")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
-sidebutton = ui_button.new(613,134,14,15,ui_button.sidepressed,'')
+sidebutton = ui_button.new(gfx.WIDTH-16,134,14,15,ui_button.sidepressed,'')
 if jacobsmod and tpt.oldmenu()==1 then
 	sidebutton:onmove(0, 256)
 end
