@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.4
+--Version 3.5
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.5: Lua5.2 support, TPT 91.0 platform API support, [] can be used to scroll, misc fixes
 --Version 3.4: some new buttons, better tooltips, fix 'Change dir' button, fix broken buttons on OS X
 --Version 3.3: fix apostophes in filenames, allow authors to rename their scripts on the server
 --Version 3.2: put MANAGER stuff in table, fix displaying changelogs
@@ -32,8 +33,8 @@ if tpt.version.jacob1s_mod == 30 and tpt.version.jacob1s_mod_minor == 0 then
 	return
 end
 
-local scriptversion = 6
-MANAGER = {["version"] = "3.4", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 7
+MANAGER = {["version"] = "3.5", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
