@@ -891,7 +891,7 @@ local function mouseclick(mousex,mousey,button,event,wheel)
 end
 local jacobsmod_old_menu_check = false
 local function keypress(key,nkey,modifier,event)
-	if jacobsmod and key == 'o' and event == 1 then jacobsmod_old_menu_check = true end
+	if jacobsmod and (key == 'o' or nkey == 96) and event == 1 then jacobsmod_old_menu_check = true end
 	if nkey==27 and not MANAGER.hidden then MANAGER.hidden=true return false end
 	if MANAGER.hidden then return end
 
@@ -922,7 +922,13 @@ local function smallstep()
 		tpt.drawline(dline[1]+sidebutton.x,dline[2]+sidebutton.y,dline[3]+sidebutton.x,dline[4]+sidebutton.y,color[1],color[2],color[3])
 	end
 	if jacobsmod_old_menu_check then
-		if tpt.oldmenu()==0 and sidebutton.y > 150 then sidebutton:onmove(0, -256) elseif tpt.oldmenu()==1 and sidebutton.y < 150 then sidebutton:onmove(0, 256) end
+		local ypos = 134
+		if jacobsmod and tpt.oldmenu and tpt.oldmenu()==1 then
+			ypos = 390
+		elseif tpt.num_menus then
+			ypos = 390-16*tpt.num_menus()
+		end
+		sidebutton:onmove(0, ypos-sidebutton.y)
 		jacobsmod_old_menu_check = false
 	end
 end
@@ -1139,10 +1145,13 @@ mainwindow:add(tempbutton)
 tempbutton = ui_button.new(100, 65, 35, 10, ui_button.onlineview, "Online")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
-sidebutton = ui_button.new(gfx.WIDTH-16,134,14,15,ui_button.sidepressed,'')
-if jacobsmod and tpt.oldmenu()==1 then
-	sidebutton:onmove(0, 256)
+local ypos = 134
+if jacobsmod and tpt.oldmenu and tpt.oldmenu()==1 then
+	ypos = 390
+elseif tpt.num_menus then
+	ypos = 390-16*tpt.num_menus()
 end
+sidebutton = ui_button.new(gfx.WIDTH-16,ypos,14,15,ui_button.sidepressed,'')
 
 local function gen_buttons_local()
 	local count = 0
