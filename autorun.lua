@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.5
+--Version 3.6
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.6: Fix bug where it might delete your scripts after updating on windows
 --Version 3.5: Lua5.2 support, TPT 91.0 platform API support, [] can be used to scroll, misc fixes
 --Version 3.4: some new buttons, better tooltips, fix 'Change dir' button, fix broken buttons on OS X
 --Version 3.3: fix apostophes in filenames, allow authors to rename their scripts on the server
@@ -33,8 +34,8 @@ if tpt.version.jacob1s_mod == 30 and tpt.version.jacob1s_mod_minor == 0 then
 	return
 end
 
-local scriptversion = 7
-MANAGER = {["version"] = "3.5", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 8
+MANAGER = {["version"] = "3.6", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
@@ -1080,7 +1081,7 @@ function ui_button.scriptcheck(self)
 		self.canupdate = false
 		localscripts[self.ID] = onlinescripts[self.ID]
 		localscripts[self.ID]["path"] = newpath
-		if oldpath ~= newpath then
+		if oldpath:gsub("\\","/") ~= newpath:gsub("\\","/") then
 			fs.removeFile(TPT_LUA_PATH.."/"..oldpath:gsub("\\","/"))
 			if running[oldpath] then
 				running[newpath],running[oldpath] = running[oldpath],nil
