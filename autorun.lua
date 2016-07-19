@@ -927,7 +927,7 @@ local function smallstep()
 		if jacobsmod and tpt.oldmenu and tpt.oldmenu()==1 then
 			ypos = 390
 		elseif tpt.num_menus then
-			ypos = 390-16*tpt.num_menus()
+			ypos = 390-16*tpt.num_menus()-(not jacobsmod and 16 or 0)
 		end
 		sidebutton:onmove(0, ypos-sidebutton.y)
 		jacobsmod_old_menu_check = false
@@ -1150,7 +1150,7 @@ local ypos = 134
 if jacobsmod and tpt.oldmenu and tpt.oldmenu()==1 then
 	ypos = 390
 elseif tpt.num_menus then
-	ypos = 390-16*tpt.num_menus()
+	ypos = 390-16*tpt.num_menus()-(not jacobsmod and 16 or 0)
 end
 sidebutton = ui_button.new(gfx.WIDTH-16,ypos,14,15,ui_button.sidepressed,'')
 
