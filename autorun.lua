@@ -37,6 +37,7 @@ end
 local scriptversion = 8
 MANAGER = {["version"] = "3.6", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
+local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
 local PATH_SEP = '\\'
 local OS = "WIN32"
