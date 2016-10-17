@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.7
+--Version 3.8
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.8: Fix being unable to download scripts with / in the name, make sure tooltips don't go offscreen
 --Version 3.7: Account for extra menu in TPT 91.4
 --Version 3.6: Fix bug where it might delete your scripts after updating on windows
 --Version 3.5: Lua5.2 support, TPT 91.0 platform API support, [] can be used to scroll, misc fixes
@@ -32,8 +33,8 @@
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 9
-MANAGER = {["version"] = "3.7", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 10
+MANAGER = {["version"] = "3.8", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
@@ -467,6 +468,13 @@ new = function(x,y,w,text)
 			end
 		end
 		self.h = self.lines*12+2
+		if self.y + self.h > gfx.HEIGHT then
+			local movement = (gfx.HEIGHT-self.h-1)-self.y
+			if self.y+movement < 0 then
+				movement = -self.y
+			end
+			self:onmove(0, movement)
+		end
 		--self.w = tpt.textwidth(self.tooltip)+3
 		self.drawbox = tooltip ~= ""
 		self.drawbackground = tooltip ~= ""
