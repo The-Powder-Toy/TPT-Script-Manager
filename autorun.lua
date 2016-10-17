@@ -1020,7 +1020,7 @@ function ui_button.downloadpressed(self)
 			local displayName
 			local function get_script(butt)
 				local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
-				displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author.."-"..onlinescripts[butt.ID].name..".lua"
+				displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author:gsub("[^%w _-]", "_").."-"..onlinescripts[butt.ID].name:gsub("[^%w _-]", "_")..".lua"
 				local name = TPT_LUA_PATH..PATH_SEP..displayName
 				if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
 					fs.makeDirectory(TPT_LUA_PATH..PATH_SEP.."downloaded")
@@ -1075,7 +1075,7 @@ function ui_button.viewonline(self)
 end
 function ui_button.scriptcheck(self)
 	local oldpath = localscripts[self.ID]["path"]
-	local newpath = "downloaded"..PATH_SEP..self.ID.." "..onlinescripts[self.ID].author.."-"..onlinescripts[self.ID].name..".lua"
+	local newpath = "downloaded"..PATH_SEP..self.ID.." "..onlinescripts[self.ID].author:gsub("[^%w _-]", "_").."-"..onlinescripts[self.ID].name:gsub("[^%w _-]", "_")..".lua"
 	if download_script(self.ID,TPT_LUA_PATH..PATH_SEP..newpath) then
 		self.canupdate = false
 		localscripts[self.ID] = onlinescripts[self.ID]
