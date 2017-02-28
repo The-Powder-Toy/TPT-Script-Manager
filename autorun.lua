@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.9: Minor icon fix for latest version of jacob1's mod
 --Version 3.8: Fix being unable to download scripts with / in the name, make sure tooltips don't go offscreen
 --Version 3.7: Account for extra menu in TPT 91.4
 --Version 3.6: Fix bug where it might delete your scripts after updating on windows
@@ -33,8 +34,8 @@
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 10
-MANAGER = {["version"] = "3.8", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 11
+MANAGER = {["version"] = "3.9", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
@@ -544,13 +545,18 @@ new_button = function(x,y,w,h,splitx,f,f2,text,localscript)
 		end
 		self.t:draw()
 		if self.localscript then
+			local swapicon = tpt.version.jacob1s_mod_build and tpt.version.jacob1s_mod_build > 76
+			local offsetX = swapicon and 1 or 0
+			local offsetY = swapicon and 2 or 0
+			local innericon = swapicon and "\133" or "\134"
+			local outericon = swapicon and "\134" or "\133"
 			if self.deletealmostselected then
 				self.deletealmostselected = false
-				tpt.drawtext(self.x+1, self.y+1, "\134", 255, 48, 32, 255)
+				tpt.drawtext(self.x+1+offsetX, self.y+1+offsetY, innericon, 255, 48, 32, 255)
 			else
-				tpt.drawtext(self.x+1, self.y+1, "\134", 160, 48, 32, 255)
+				tpt.drawtext(self.x+1+offsetX, self.y+1+offsetY, innericon, 160, 48, 32, 255)
 			end
-			tpt.drawtext(self.x+1, self.y+1, "\133", 255, 255, 255, 255)
+			tpt.drawtext(self.x+1+offsetX, self.y+1+offsetY, outericon, 255, 255, 255, 255)
 		else
 			tpt.drawtext(self.x+1, self.y+1, "\147", 255, 200, 80, 255)
 		end
