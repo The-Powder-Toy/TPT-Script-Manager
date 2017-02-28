@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.8
+--Version 3.9
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
