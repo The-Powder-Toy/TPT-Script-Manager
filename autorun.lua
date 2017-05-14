@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.9
+--Version 3.10
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.10: Fix HTTP requests, without this update the online section may break
 --Version 3.9: Minor icon fix for latest version of jacob1's mod
 --Version 3.8: Fix being unable to download scripts with / in the name, make sure tooltips don't go offscreen
 --Version 3.7: Account for extra menu in TPT 91.4
@@ -34,8 +35,8 @@
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 11
-MANAGER = {["version"] = "3.9", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 12
+MANAGER = {["version"] = "3.10", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
@@ -816,7 +817,7 @@ function download_file(url)
 	conn:settimeout(5)
 	if not succ then return end
 	local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..((OS == "WIN32" or OS == "WIN64") and "WIN; " or (os == "MACOSX" and "OSX; " or "LIN; "))..(jacobsmod and "M1" or "M0")..") SCRIPT/"..MANAGER.version
-	succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\n")
+	succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\r\n")
 	if not succ then return end
 	local data=""
 	local c=""
