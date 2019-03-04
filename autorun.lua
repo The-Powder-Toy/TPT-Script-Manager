@@ -52,8 +52,8 @@ end
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 12
-MANAGER = {["version"] = "3.10", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 13
+MANAGER = {["version"] = "3.11", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
