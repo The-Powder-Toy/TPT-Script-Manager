@@ -1044,6 +1044,9 @@ function ui_button.donepressed(self)
 	if requiresrestart then do_restart() return end
 	save_last()
 end
+function ui_button.restartpressed(self)
+    do_restart()
+end
 function ui_button.downloadpressed(self)
 	for i,but in ipairs(mainwindow.checkbox.list) do
 		if but.selected then
@@ -1161,6 +1164,7 @@ end
 donebutton = ui_button.new(55,339,29,10,ui_button.donepressed,"DONE")
 mainwindow:add(donebutton)
 mainwindow:add(ui_button.new(134,339,40,10,ui_button.sidepressed,"CANCEL"))
+mainwindow:add(ui_button.new(134,339,40,10,ui_button.restartpressed,"RESTART"))
 --mainwindow:add(ui_button.new(152,339,29,10,ui_button.selectnone,"NONE"))
 local nonebutton = ui_button.new(62,81,8,8,ui_button.selectnone,"")
 nonebutton.drawbox = true
