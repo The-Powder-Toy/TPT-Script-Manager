@@ -94,8 +94,11 @@ local running = {}
 local requiresrestart=false
 local online = false
 local first_online = true
+local online_req = nil
+local script_manager_update_req = nil
 local updatetable --temporarily holds info on script manager updates
 local gen_buttons
+local check_req_status
 local sidebutton
 local download_file
 local settings = {}
@@ -123,7 +126,11 @@ local function readScriptInfo(list)
 		for k,v in i:gmatch("(%w+):\"([^\"]*)\"") do
 			t[k]= tonumber(v) or v:gsub("\r",""):gsub("\\n","\n")
 		end
-		scriptlist[t.ID] = t
+		if not t.ID then
+			print("Skipping invalid script in script list")
+		else
+			scriptlist[t.ID] = t
+		end
 	end
 	return scriptlist
 end
@@ -786,7 +793,7 @@ function MANAGER.download(url)
 	return download_file(url)
 end
 function MANAGER.scriptinfo(id)
-	local url = "http://starcatcher.us/scripts/main.lua"
+	local url = "https://starcatcher.us/scripts/main.lua"
 	if id then
 		url = url.."?info="..id
 	end
@@ -825,45 +832,33 @@ end
 --mniip's download thing (mostly)
 local pattern = "http://w*%.?(.-)(/.*)"
 function download_file(url)
-	local _,_,host,rest = url:find(pattern)
-	if not host or not rest then MANAGER.print("Bad link") return end
-	local conn=socket.tcp()
-	if not conn then return end
-	local succ=pcall(conn.connect,conn,host,80)
-	conn:settimeout(5)
-	if not succ then return end
-	local userAgent = "PowderToy/"..tpt.version.major.."."..tpt.version.minor.."."..tpt.version.build.." ("..((OS == "WIN32" or OS == "WIN64") and "WIN; " or (os == "MACOSX" and "OSX; " or "LIN; "))..(jacobsmod and "M1" or "M0")..") SCRIPT/"..MANAGER.version
-	succ,resp,something=pcall(conn.send,conn,"GET "..rest.." HTTP/1.1\r\nHost: "..host.."\r\nConnection: close\r\nUser-Agent: "..userAgent.."\r\n\r\n")
-	if not succ then return end
-	local data=""
-	local c=""
-	while c do
-		c=conn:receive("*l")
-		if c then
-			data=data.."\n"..c
-		end
+	if not http then
+		MANAGER.print("TPT 95.0 or greater required to use http api", 255, 0, 0)
+		return false
 	end
-	if data=="" then MANAGER.print("no data") return end
-	local first,last,code = data:find("HTTP/1%.1 (.-) .-\n")
-	while last do
-		data = data:sub(last+1)
-		first,last,header = data:find("^([^\n]-:.-)\n")
-		--read something from headers?
-		if header then
-			if tonumber(code)==302 then
-				local _,_,new = header:find("^Location: (.*)")
-				if new then return download_file(new) end
+	local req = http.get(url)
+	local timeout_after = socket.gettime() + 3
+	while true do
+		local status = req:status()
+		if status ~= "running" then
+			local body, status_code = req:finish()
+			if status_code and status_code ~= 200 then
+				MANAGER.print("http download failed with status code " .. status_code, 255, 0, 0)
+				return nil
 			end
+			return body
+		end
+
+		if socket.gettime() > timeout_after then
+			MANAGER.print("http download timed out ", 255, 0, 0)
+			req:cancel()
+			return
 		end
 	end
-	if host:find("pastebin.com") then --pastebin adds some weird numbers
-		_,_,data=data:find("\n[^\n]*\n(.*)\n.+\n$")
-	end
-	return data
 end
 --Downloads to a location
 local function download_script(ID,location)
-	local file = download_file("http://starcatcher.us/scripts/main.lua?get="..ID)
+	local file = download_file("https://starcatcher.us/scripts/main.lua?get="..ID)
 	if file then
 		f=io.open(location,"w")
 		f:write(file)
@@ -911,6 +906,11 @@ local function step()
 	tpt.drawtext(55,55,"Click a script to toggle, hit DONE when finished")
 	tpt.drawtext(474,55,"Script Manager v"..MANAGER.version)--479 for simple versions
 	tooltip:draw()
+
+	if online_req and online then
+		local textwidth = tpt.textwidth("Loading ...")
+		tpt.drawtext(mainwindow.checkbox.x + (mainwindow.checkbox.w - textwidth) / 2, mainwindow.checkbox.y + (mainwindow.checkbox.h - 6) / 2, "Loading ...")
+	end
 end
 local function mouseclick(mousex,mousey,button,event,wheel)
 	sidebutton:process(mousex,mousey,button,event,wheel)
@@ -962,6 +962,7 @@ local function smallstep()
 		sidebutton:onmove(0, ypos-sidebutton.y)
 		jacobsmod_old_menu_check = false
 	end
+	check_req_status()
 end
 --button functions on click
 function ui_button.reloadpressed(self)
@@ -1045,12 +1046,17 @@ function ui_button.donepressed(self)
 	save_last()
 end
 function ui_button.downloadpressed(self)
+	local successful_download = false
 	for i,but in ipairs(mainwindow.checkbox.list) do
 		if but.selected then
 			--maybe do better display names later
 			local displayName
 			local function get_script(butt)
-				local script = download_file("http://starcatcher.us/scripts/main.lua?get="..butt.ID)
+				local script = download_file("https://starcatcher.us/scripts/main.lua?get="..butt.ID)
+				if not script then
+					MANAGER.print("Failed to download " .. but.t.text, 255, 0, 0)
+					return false
+				end
 				displayName = "downloaded"..PATH_SEP..butt.ID.." "..onlinescripts[butt.ID].author:gsub("[^%w _-]", "_").."-"..onlinescripts[butt.ID].name:gsub("[^%w _-]", "_")..".lua"
 				local name = TPT_LUA_PATH..PATH_SEP..displayName
 				if not fs.exists(TPT_LUA_PATH..PATH_SEP.."downloaded") then
@@ -1068,21 +1074,26 @@ function ui_button.downloadpressed(self)
 				localscripts[butt.ID] = onlinescripts[butt.ID]
 				localscripts[butt.ID]["path"] = displayName
 				dofile(name)
+
+				return true
 			end
 			local status,err = pcall(get_script, but)
 			if not status then
 				MANAGER.print(err,255,0,0)
 				print(err)
 				but.selected = false
-			else
+			elseif err == true then
 				MANAGER.print("Downloaded and started "..but.t.text)
 				running[displayName] = true
+				successful_download = true
 			end
 		end
 	end
-	MANAGER.hidden = true
-	ui_button.localview()
-	save_last()
+	if successful_download then
+		MANAGER.hidden = true
+		ui_button.localview()
+		save_last()
+	end
 end
 
 function ui_button.pressed(self)
@@ -1211,25 +1222,63 @@ local function gen_buttons_local()
 	num_files = count + #filenames
 end
 local function gen_buttons_online()
-	local list = download_file("http://starcatcher.us/scripts/main.lua")
-	onlinescripts = readScriptInfo(list)
-	local sorted = {}
-	for k,v in pairs(onlinescripts) do table.insert(sorted, v) end
-	table.sort(sorted, function(first,second) return first.ID < second.ID end)
-	for k,v in pairs(sorted) do
-		local check = mainwindow.checkbox:add(ui_button.pressed, ui_button.viewonline, v.name, false)
-		check.ID = v.ID
-		check.checkbut.ID = v.ID
-		if localscripts[v.ID] then
-			check.running = true
-			if tonumber(v.version) > tonumber(localscripts[check.ID].version) then
-				check.checkbut.canupdate = true
+	if not http then
+		MANAGER.print("TPT 95.0 or greater required to use the online tab", 255, 0, 0)
+		return
+	end
+
+	if online_req then
+		online_req:cancel()
+	end
+
+	online_req = http.get("https://starcatcher.us/scripts/main.lua")
+	
+	if first_online then
+		first_online = false
+		script_manager_update_req = http.get("https://starcatcher.us/scripts/main.lua?info=1")
+	end
+end
+
+-- Check status of "Online" tab request
+local function check_online_req_status()
+	if online_req and online_req:status() ~= "running" then
+		local list, status_code = online_req:finish()
+		online_req = nil
+		if status_code ~= 200 then
+			MANAGER.print("script list download failed with status code " .. status_code, 255, 0, 0)
+			return
+		end
+		
+		if not online then return end
+
+		onlinescripts = readScriptInfo(list)
+		local sorted = {}
+		for k,v in pairs(onlinescripts) do table.insert(sorted, v) end
+		table.sort(sorted, function(first,second) return first.ID < second.ID end)
+		for k,v in pairs(sorted) do
+			local check = mainwindow.checkbox:add(ui_button.pressed, ui_button.viewonline, v.name, false)
+			check.ID = v.ID
+			check.checkbut.ID = v.ID
+			if localscripts[v.ID] then
+				check.running = true
+				if tonumber(v.version) > tonumber(localscripts[check.ID].version) then
+					check.checkbut.canupdate = true
+				end
 			end
 		end
 	end
-	if first_online then
-		first_online = false
-		local updateinfo = download_file("http://starcatcher.us/scripts/main.lua?info=1")
+end
+
+-- Check status of self update check
+local function check_update_req_status()
+	if script_manager_update_req and script_manager_update_req:status() ~= "running" then
+		local updateinfo, status_code = script_manager_update_req:finish()
+		script_manager_update_req = nil
+		if status_code ~= 200 then
+			MANAGER.print("self update check failed with status code " .. status_code, 255, 0, 0)
+			return
+		end
+		
 		updatetable = readScriptInfo(updateinfo)
 		if not updatetable[1] then return end
 		if tonumber(updatetable[1].version) > scriptversion then
@@ -1241,6 +1290,13 @@ local function gen_buttons_online()
 		end
 	end
 end
+
+-- Check status of pending requests
+function check_req_status()
+	check_online_req_status()
+	check_update_req_status()
+end
+
 gen_buttons = function()
 	mainwindow.checkbox:clear()
 	if online then
