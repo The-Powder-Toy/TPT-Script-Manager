@@ -102,6 +102,7 @@ local check_req_status
 local sidebutton
 local download_file
 local settings = {}
+local search_terms = {}
 math.randomseed(os.time()) math.random() math.random() math.random() --some filler randoms
 
 --get line that can be saved into scriptinfo file
@@ -752,6 +753,7 @@ new = function(x,y,w,h)
 	function w:add(m,name)
 		if name then w[name]=m end
 		table.insert(self.sub,m)
+		return m
 	end
 	w:drawadd(function(self)
 		for i,sub in ipairs(self.sub) do
@@ -966,15 +968,24 @@ local function smallstep()
 end
 --button functions on click
 function ui_button.reloadpressed(self)
-	load_filenames()
-	load_downloaded()
-	gen_buttons()
-	mainwindow.checkbox:updatescroll()
-	if num_files == 0 then
-		MANAGER.print("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
-		fs.makeDirectory(TPT_LUA_PATH)
+	if not online then
+		load_filenames()
+		load_downloaded()
+		gen_buttons()
+		mainwindow.checkbox:updatescroll()
+		if num_files == 0 then
+			MANAGER.print("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
+			fs.makeDirectory(TPT_LUA_PATH)
+		else
+			MANAGER.print("Reloaded file list, found "..num_files.." scripts")
+		end
 	else
-		MANAGER.print("Reloaded file list, found "..num_files.." scripts")
+		search_terms = {}
+		local filter = tpt.input("Script filtering", "Enter search terms to filter by")
+		for match in filter:gmatch("%w+") do
+			table.insert(search_terms, match)
+		end
+		gen_buttons()
 	end
 end
 function ui_button.selectnone(self)
@@ -1147,7 +1158,7 @@ function ui_button.doupdate(self)
 	localscripts[1] = updatetable[1]
 	do_restart()
 end
-local uploadscriptbutton
+local uploadscriptbutton, reloadbutton
 function ui_button.localview(self)
 	if online then
 		online = false
@@ -1156,6 +1167,7 @@ function ui_button.localview(self)
 		donebutton.w = 29 donebutton.x2 = donebutton.x + donebutton.w
 		donebutton.f = ui_button.donepressed
 		uploadscriptbutton.t.text = icons["folder"].." Script Folder"
+		reloadbutton.t.text = "RELOAD"
 	end
 end
 function ui_button.onlineview(self)
@@ -1166,6 +1178,8 @@ function ui_button.onlineview(self)
 		donebutton.w = 55 donebutton.x2 = donebutton.x + donebutton.w
 		donebutton.f = ui_button.downloadpressed
 		uploadscriptbutton.t.text = "Upload Script"
+		reloadbutton.t.text = "FILTER"
+		search_terms = {}
 	end
 end
 --add buttons to window
@@ -1177,10 +1191,9 @@ local nonebutton = ui_button.new(62,81,8,8,ui_button.selectnone,"")
 nonebutton.drawbox = true
 mainwindow:add(nonebutton)
 mainwindow:add(ui_button.new(538,339,33,10,ui_button.consoleclear,"CLEAR"))
-mainwindow:add(ui_button.new(278,67,39,10,ui_button.reloadpressed,"RELOAD"))
+reloadbutton = mainwindow:add(ui_button.new(278,67,39,10,ui_button.reloadpressed,"RELOAD"), "reload")
 mainwindow:add(ui_button.new(378,67,51,10,ui_button.changedir,"Change dir"))
-uploadscriptbutton = ui_button.new(478,67,79,10,ui_button.uploadscript, icons["folder"].." Script Folder")
-mainwindow:add(uploadscriptbutton)
+uploadscriptbutton = mainwindow:add(ui_button.new(478,67,79,10,ui_button.uploadscript, icons["folder"].." Script Folder"))
 local tempbutton = ui_button.new(60, 65, 30, 10, ui_button.localview, "Local")
 tempbutton.drawbox = true
 mainwindow:add(tempbutton)
@@ -1239,6 +1252,13 @@ local function gen_buttons_online()
 	end
 end
 
+local function check_search_term(script, search_term)
+	search_term = search_term:lower()
+	return script.name and script.name:lower():match(search_term)
+		or script.description and script.description:lower():match(search_term)
+		or script.author and script.author:lower():match(search_term)
+end
+
 -- Check status of "Online" tab request
 local function check_online_req_status()
 	if online_req and online_req:status() ~= "running" then
@@ -1256,16 +1276,24 @@ local function check_online_req_status()
 		for k,v in pairs(onlinescripts) do table.insert(sorted, v) end
 		table.sort(sorted, function(first,second) return first.ID < second.ID end)
 		for k,v in pairs(sorted) do
-			local check = mainwindow.checkbox:add(ui_button.pressed, ui_button.viewonline, v.name, false)
-			check.ID = v.ID
-			check.checkbut.ID = v.ID
-			if localscripts[v.ID] then
-				check.running = true
-				if tonumber(v.version) > tonumber(localscripts[check.ID].version) then
-					check.checkbut.canupdate = true
+			local matches = true
+			for i,term in ipairs(search_terms) do
+				matches = matches and check_search_term(v, term)
+			end
+			if matches then
+				local check = mainwindow.checkbox:add(ui_button.pressed, ui_button.viewonline, v.name, false)
+				check.ID = v.ID
+				check.checkbut.ID = v.ID
+				if localscripts[v.ID] then
+					check.running = true
+					if tonumber(v.version) > tonumber(localscripts[check.ID].version) then
+						check.checkbut.canupdate = true
+					end
 				end
 			end
 		end
+
+		mainwindow.checkbox:updatescroll()
 	end
 end
 
