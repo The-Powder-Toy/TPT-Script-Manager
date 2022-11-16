@@ -1,0 +1,5 @@
+*
+!*.lua
+!mime.types
+!nginx.conf
+!static/

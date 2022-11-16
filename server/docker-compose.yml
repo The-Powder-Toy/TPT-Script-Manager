@@ -1,0 +1,23 @@
+version: "3.7"
+
+services:
+  app:
+    build: .
+    restart: always
+    ports:
+      - 3001:3001
+  database:
+    image: docker.io/postgres:15.1-alpine3.16
+    restart: always
+    hostname: database
+    environment:
+      POSTGRES_USER: tpt_scripts
+      POSTGRES_PASSWORD: bagels
+      POSTGRES_DB: tpt_scripts
+    volumes:
+      - ./10-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
+    driver: local
