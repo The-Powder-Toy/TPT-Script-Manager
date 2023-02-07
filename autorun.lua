@@ -212,8 +212,10 @@ local function load_last()
 				TPT_LUA_PATH=str
 			elseif tok=="SET" then
 				local ident,name,val = string.match(str,"(.-) (.-):\"(.-)\"")
-				if settings[ident] then settings[ident][name]=val
-				else settings[ident]={[name]=val} end
+				if ident and name then
+					if settings[ident] then settings[ident][name]=val
+					else settings[ident]={[name]=val} end
+				end
 			end
 		end
 	end
