@@ -22,6 +22,7 @@ local function emit_manifest(before_func, after_func)
 			Module        = row.module,
 			Title         = row.title,
 			Description   = row.description,
+			Dependencies  = row.dependencies,
 			Listed        = row.listed,
 			Version       = row.version,
 			StaffApproved = row.staff_approved,

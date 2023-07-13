@@ -106,6 +106,7 @@ array whose items are objects with the following properties:
  - `Module`: script name string;
  - `Title`: script title string;
  - `Description`: script description string;
+ - `Dependencies`: script dependencies string;
  - `Listed`: a boolean, indicating whether the script should show up in search
    results (this has no effect on whether it is available for download, it is
    only a hint to the client);
@@ -131,6 +132,7 @@ The request body is a form with the following properties:
 
  - `Title`: desired script title;
  - `Description`: desired script description;
+ - `Dependencies`: desired script dependencies;
  - `Data`: desired script data; this is absolutely not verified for correctness
    or even format, that is the client's responsibility.
 
@@ -164,6 +166,8 @@ The response body is a JSON object with the following properties:
 	  bytes, or is the empty string;
 	- `"DescriptionLength"` if the `Description` form parameter is longer than
 	  500 bytes, or is the empty string;
+  - `"DependenciesLength"` if the `Description` form parameter is longer than
+    500 bytes;
    also present if `Status` is `"Forbidden"`, in which case it elaborates on the
    nature of the issue, this can be one of:
 	- `"NoAccess"` the authorized user is not the owner of the script `Name`;

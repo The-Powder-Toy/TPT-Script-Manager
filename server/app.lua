@@ -92,12 +92,13 @@ local function check_present(params)
 end
 
 local manage_script_bad_request_reasons = {
-	too_many_scripts     = "TooManyScripts",
-	too_much_script_data = "TooMuchScriptData",
-	module_too_long      = "ModuleLength",
-	bad_module           = "ModuleFormat",
-	title_too_long       = "TitleLength",
-	description_too_long = "DescriptionLength",
+	too_many_scripts      = "TooManyScripts",
+	too_much_script_data  = "TooMuchScriptData",
+	module_too_long       = "ModuleLength",
+	bad_module            = "ModuleFormat",
+	title_too_long        = "TitleLength",
+	description_too_long  = "DescriptionLength",
+	dependencies_too_long = "DependenciesLength",
 }
 app:match("/scripts/:name", function(self)
 	self.peer = {}
@@ -116,25 +117,27 @@ app:match("/scripts/:name", function(self)
 	local action = "delete"
 	local title = db.NULL
 	local description = db.NULL
+	local dependencies = db.NULL
 	local data = db.NULL
 	if self.req.method == "PUT" then
 		action = "upsert"
 		local present, err = check_present({
-			{ value = self.params.Title      , name = "Title"       },
-			{ value = self.params.Description, name = "Description" },
-			{ value = self.params.Data       , name = "Data"        },
+			{ value = self.params.Title       , name = "Title"        },
+			{ value = self.params.Description , name = "Description"  },
+			{ value = self.params.Dependencies, name = "Dependencies" },
+			{ value = self.params.Data        , name = "Data"         },
 		})
 		if not present then
 			return record_failure(self, err)
 		end
-		title, description, data = unpack(present)
+		title, description, dependencies, data = unpack(present)
 	end
 	local bypass_owner_check = is_staff(self) and self.req.headers["X-BypassOwnerCheck"] or false
 	data_lock_acquire(self)
 	local result = db.query([[
 		select status, new_blob, old_blob
-			from manage_script(?, ?, ?, ?, ?, ?, ?);
-	]], action, self.peer.user_id, self.params.name, title, description, data, bypass_owner_check)[1]
+			from manage_script(?, ?, ?, ?, ?, ?, ?, ?);
+	]], action, self.peer.user_id, self.params.name, title, description, dependencies, data, bypass_owner_check)[1]
 	if manage_script_bad_request_reasons[result.status] then
 		return record_failure(self, { status = 400, json = { Status = "BadRequest", Reason = manage_script_bad_request_reasons[result.status] } })
 	elseif result.status == "user_locked" then

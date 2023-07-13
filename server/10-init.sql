@@ -66,6 +66,9 @@ create table scripts (
 	description text
 		not null
 		constraint scripts_description_length check (length(description) between 1 and 500),
+	dependencies text
+		not null
+		constraint scripts_dependencies_length check (length(dependencies) between 0 and 500),
 	listed boolean
 		not null,
 	data bytea
@@ -96,6 +99,7 @@ create type manage_script_status as enum (
 	'bad_module',
 	'title_too_long',
 	'description_too_long',
+	'dependencies_too_long',
 	'no_access',
 	'no_user'
 );
@@ -110,6 +114,7 @@ create function manage_script(
 	in module_in text,
 	in title_in text,
 	in description_in text,
+	in dependencies_in text,
 	in listed_in boolean,
 	in data_in bytea,
 	in bypass_owner_check boolean
@@ -149,12 +154,13 @@ begin
 			-- We lock the row for update even on conflict when the update condition
 			-- evaluates to false; the manual says all rows that are considered for
 			-- updating get locked.
-			insert into scripts (user_id, module, title, description, listed, data, blob)
-				values (user_id_in, module_in, title_in, description_in, listed_in, data_in, new_blob)
+			insert into scripts (user_id, module, title, description, dependencies, listed, data, blob)
+				values (user_id_in, module_in, title_in, description_in, dependencies_in, listed_in, data_in, new_blob)
 				on conflict on constraint scripts_module_uq do update set
 					version = scripts.version + 1,
 					title = title_in,
 					description = description_in,
+					dependencies = dependencies_in,
 					listed = listed_in,
 					data = data_in,
 					updated_at = transaction_timestamp(),
@@ -200,6 +206,8 @@ begin
 					result.status = 'title_too_long';
 				when 'scripts_description_length' then
 					result.status = 'description_too_long';
+				when 'scripts_dependencies_length' then
+					result.status = 'dependencies_too_long';
 				end case;
 			end;
 		end;
@@ -392,6 +400,7 @@ create view manifest as
 		scripts.module as module,
 		scripts.title as title,
 		scripts.description as description,
+		scripts.dependencies as dependencies,
 		scripts.listed as listed,
 		scripts.version as version,
 		scripts.staff_approved as staff_approved,
