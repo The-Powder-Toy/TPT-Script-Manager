@@ -87,6 +87,23 @@ else
 		EXE_NAME = jacobsmod and "Jacob1\'s Mod" or "powder"
 	end
 end
+local beginInput, beginConfirm = ui.beginInput, ui.beginConfirm
+if not beginInput then
+	beginInput = function(...)
+		local args = {...}
+		local cb = table.remove(args)
+		local input = tpt.input(unpack(args))
+		cb(input)
+	end
+end
+if not beginConfirm then
+	beginConfirm = function(...)
+		local args = {...}
+		local cb = table.remove(args)
+		local confirmed = tpt.confirm(unpack(args))
+		cb(confirmed)
+	end
+end
 local filenames = {}
 local num_files = 0 --downloaded scripts aren't stored in filenames
 local localscripts = {}
@@ -99,6 +116,7 @@ local online_req = nil
 local script_manager_update_req = nil
 local updatetable --temporarily holds info on script manager updates
 local gen_buttons
+local count_local_scripts
 local check_req_status
 local sidebutton
 local download_file
@@ -170,6 +188,7 @@ local function save_last()
 end
 
 local function load_downloaded()
+	localscripts = {}
 	local f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo","r")
 	if f then
 		local lines = f:read("*a")
@@ -969,26 +988,34 @@ local function smallstep()
 	end
 	check_req_status()
 end
+local function reload_action()
+	load_filenames()
+	load_downloaded()
+	if not online then
+		gen_buttons()
+		mainwindow.checkbox:updatescroll()
+	else
+		count_local_scripts()
+	end
+	if num_files == 0 then
+		MANAGER.print("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
+		fs.makeDirectory(TPT_LUA_PATH)
+	else
+		MANAGER.print("Reloaded file list, found "..num_files.." scripts")
+	end
+end
 --button functions on click
 function ui_button.reloadpressed(self)
 	if not online then
-		load_filenames()
-		load_downloaded()
-		gen_buttons()
-		mainwindow.checkbox:updatescroll()
-		if num_files == 0 then
-			MANAGER.print("No scripts found in '"..TPT_LUA_PATH.."' folder",255,255,0)
-			fs.makeDirectory(TPT_LUA_PATH)
-		else
-			MANAGER.print("Reloaded file list, found "..num_files.." scripts")
-		end
+		reload_action()
 	else
-		search_terms = {}
-		local filter = tpt.input("Script filtering", "Enter search terms to filter by")
-		for match in filter:gmatch("%w+") do
-			table.insert(search_terms, match)
-		end
-		gen_buttons()
+		beginInput("Script filtering", "Enter search terms to filter by", function(filter)
+			search_terms = {}
+			for match in filter:gmatch("%w+") do
+				table.insert(search_terms, match)
+			end
+			gen_buttons()
+		end)
 	end
 end
 function ui_button.selectnone(self)
@@ -1000,15 +1027,16 @@ function ui_button.consoleclear(self)
 	mainwindow.menuconsole:clear()
 end
 function ui_button.changedir(self)
-	local last = TPT_LUA_PATH
-	local new = tpt.input("Change search directory","Enter the folder where your scripts are",TPT_LUA_PATH,TPT_LUA_PATH)
-	if new~=last and new~="" then
-		fs.removeFile(last..PATH_SEP.."autorunsettings.txt")
-		MANAGER.print("Directory changed to "..new,255,255,0)
-		TPT_LUA_PATH = new
-	end
-	ui_button.reloadpressed()
-	save_last()
+	beginInput("Change search directory", "Enter the folder where your scripts are", TPT_LUA_PATH, TPT_LUA_PATH, function(new)
+		local last = TPT_LUA_PATH
+		if new~=last and new~="" then
+			fs.removeFile(last..PATH_SEP.."autorunsettings.txt")
+			MANAGER.print("Directory changed to "..new,255,255,0)
+			TPT_LUA_PATH = new
+		end
+		reload_action()
+		save_last()
+	end)
 end
 function ui_button.uploadscript(self)
 	if not online then
@@ -1114,8 +1142,9 @@ function ui_button.pressed(self)
 	self.selected = not self.selected
 end
 function ui_button.delete(self)
-	--there is no tpt.confirm() yet
-	if tpt.input("Delete File", "Delete "..self.t.text.."?", "yes", "no") == "yes" then
+	local cb = function(confirmed)
+		if confirmed ~= true then return end
+
 		local filepath = self.ID and localscripts[self.ID]["path"] or self.t.text
 		fs.removeFile(TPT_LUA_PATH.."/"..filepath:gsub("\\","/"))
 		if running[filepath] then running[filepath] = nil end
@@ -1125,6 +1154,7 @@ function ui_button.delete(self)
 		load_filenames()
 		gen_buttons()
 	end
+	beginConfirm("Delete File", "Delete "..self.t.text.."?", cb)
 end
 function ui_button.viewonline(self)
 	open_link("https://starcatcher.us/scripts?view="..self.ID)
@@ -1236,6 +1266,11 @@ local function gen_buttons_local()
 		end
 	end
 	num_files = count + #filenames
+end
+function count_local_scripts()
+	local total = #filenames
+	for k in pairs(localscripts) do total = total + 1 end
+	num_files = total
 end
 local function gen_buttons_online()
 	if not http then
