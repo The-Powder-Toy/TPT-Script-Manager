@@ -156,6 +156,18 @@ local function readScriptInfo(list)
 end
 
 --save settings
+local function save_dir()
+	-- Older versions of script manager stored settings here when TPT_LUA_PATH was changed away from scripts/
+	-- But now, only the "DIR" argument is kept here
+	fs.removeFile("autorunsettings.txt")
+	if TPT_LUA_PATH ~= "scripts" then
+		f = io.open("autorunsettings.txt", "w")
+		if f then
+			f:write("DIR "..TPT_LUA_PATH)
+			f:close()
+		end
+	end
+end
 local function save_last()
 	local savestring=""
 	for script,v in pairs(running) do
@@ -163,20 +175,19 @@ local function save_last()
 	end
 	savestring = "SAV "..savestring.."\nDIR "..TPT_LUA_PATH
 	for k,t in pairs(settings) do
-	for n,v in pairs(t) do
-		savestring = savestring.."\nSET "..k.." "..n..":\""..v.."\""
+		for n,v in pairs(t) do
+			savestring = savestring.."\nSET "..k.." "..n..":\""..v.."\""
+		end
 	end
-	end
-	local f
-	if TPT_LUA_PATH == "scripts" then
-		f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
-	else
-		f = io.open("autorunsettings.txt", "w")
-	end
+	local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
 	if f then
 		f:write(savestring)
 		f:close()
+	else
+		MANAGER.print("Couldn't save autorunsettings.txt")
 	end
+
+	save_dir()
 
 	f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo", "w")
 	if f then
@@ -207,11 +218,8 @@ local function load_downloaded()
 end
 
 --load settings before anything else
-local function load_last()
-	local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt","r")
-	if not f then
-		f = io.open("autorunsettings.txt","r")
-	end
+local function load_settings(settings_file)
+	local f = io.open(settings_file, "r")
 	if f then
 		local lines = {}
 		local line = f:read("*l")
@@ -238,6 +246,13 @@ local function load_last()
 			end
 		end
 	end
+end
+local function load_last()
+	-- Load settings from both places.
+	-- Older versions of script manager may keep all settings in base-dir autorunsettings.txt
+	-- Modern versions only keep the DIR arg there, and put everything else into the scripts subfolder
+	load_settings("autorunsettings.txt")
+	load_settings(TPT_LUA_PATH .. PATH_SEP .. "autorunsettings.txt")
 
 	load_downloaded()
 end
@@ -913,8 +928,10 @@ local function download_script(ID, location, cb)
 end
 
 --Restart exe (if named correctly)
-local function do_restart()
-	save_last()
+local function do_restart(skip_save)
+	if not skip_save then
+		save_last()
+	end
 	if platform then
 		platform.restart()
 	end
@@ -1048,15 +1065,17 @@ function ui_button.consoleclear(self)
 	mainwindow.menuconsole:clear()
 end
 function ui_button.changedir(self)
-	beginInput("Change search directory", "Enter the folder where your scripts are", TPT_LUA_PATH, TPT_LUA_PATH, function(new)
+	beginInput("Change search directory", "Enter the folder where your scripts and settings are (requires restart)", TPT_LUA_PATH, TPT_LUA_PATH, function(new)
 		local last = TPT_LUA_PATH
-		if new~=last and new~="" then
-			fs.removeFile(last..PATH_SEP.."autorunsettings.txt")
+		if new and new~=last and new~="" then
+			save_last()
+
 			MANAGER.print("Directory changed to "..new,255,255,0)
 			TPT_LUA_PATH = new
+
+			save_dir()
+			do_restart(true)
 		end
-		reload_action()
-		save_last()
 	end)
 end
 function ui_button.uploadscript(self)
