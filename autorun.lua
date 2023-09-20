@@ -162,7 +162,7 @@ local function save_dir()
 	-- But now, only the "DIR" argument is kept here
 	fs.removeFile("autorunsettings.txt")
 	if TPT_LUA_PATH ~= "scripts" then
-		f = io.open("autorunsettings.txt", "w")
+		f = io.open("autorunsettings.txt", "wb")
 		if f then
 			f:write("DIR "..TPT_LUA_PATH)
 			f:close()
@@ -180,7 +180,7 @@ local function save_last()
 			savestring = savestring.."\nSET "..k.." "..n..":\""..v.."\""
 		end
 	end
-	local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "w")
+	local f = io.open(TPT_LUA_PATH..PATH_SEP.."autorunsettings.txt", "wb")
 	if f then
 		f:write(savestring)
 		f:close()
@@ -190,7 +190,7 @@ local function save_last()
 
 	save_dir()
 
-	f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo", "w")
+	f = io.open(TPT_LUA_PATH..PATH_SEP.."downloaded"..PATH_SEP.."scriptinfo", "wb")
 	if f then
 		for k,v in pairs(localscripts) do
 			f:write(scriptInfoString(v).."\n")
@@ -917,7 +917,7 @@ end
 local function download_script(ID, location, cb)
 	download_file("https://starcatcher.us/scripts/main.lua?get=" .. ID, function(file, status_code)
 		if file and status_code == 200 then
-			f = io.open(location, "w")
+			f = io.open(location, "wb")
 			f:write(file)
 			f:close()
 			cb(true, status_code)
