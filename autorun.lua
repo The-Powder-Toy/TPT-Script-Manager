@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.13
+--Version 3.14
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,7 +9,8 @@
 --prettier, organize code
 
 --CHANGES:
---Version 3.13: Better support for upcoming versions of TPT, all script downloads now async, settings now stored separately per scripts directory, fix rare bug that wipes settings
+--Version 3.14: Fix extra newlines being inserted into scripts on Windows
+--Version 3.13: Better support for upcoming versions of TPT, all script downloads now async, settings now stored separately per scripts directory, fix another rare failure on startup
 --Version 3.12: Use https for all requests, online view loads async, add FILTER button to online, fix rare failure on startup if downloaded scripts list is corrupted
 --Version 3.11: Fix icons in 94.0, fix "view script in browser"
 --Version 3.10: Fix HTTP requests, without this update the online section may break
@@ -54,8 +55,8 @@ end
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 15
-MANAGER = {["version"] = "3.13", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 16
+MANAGER = {["version"] = "3.14", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
