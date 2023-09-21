@@ -1226,13 +1226,8 @@ function ui_button.scriptcheck(self)
 	end)
 end
 function ui_button.doupdate(self)
-	local scriptname, scriptbackup = "autorun.lua", "autorunold.lua"
-	if jacobsmod and jacobsmod >= 30 then
-		scriptname, scriptbackup = "scriptmanager.lua", "scriptmanagerold.lua"
-	end
-
-	fileSystem.move(scriptname, scriptbackup)
-	download_script(1, scriptname, function()
+	fileSystem.move("autorun.lua", "autorunold.lua")
+	download_script(1, "autorun.lua", function()
 		localscripts[1] = updatetable[1]
 		do_restart()
 	end)
