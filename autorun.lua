@@ -43,7 +43,7 @@ local icons = {
 	["delete2"] = "\xEE\x80\x86",
 	["folder"] = "\xEE\x80\x93"
 }
-if jacobsmod then
+if not evt then
 	icons = {
 		["delete1"] = "\133",
 		["delete2"] = "\134",
@@ -985,18 +985,17 @@ local function mouseclick(mousex,mousey,button,event,wheel)
 	return false
 end
 local jacobsmod_old_menu_check = false
-local function keypress(key,nkey,modifier,event)
-	if jacobsmod and (key == 'o' or nkey == 96) and event == 1 then jacobsmod_old_menu_check = true end
-	if nkey==27 and not MANAGER.hidden then MANAGER.hidden=true return false end
+local function keypress(key, scan, rep, shift, ctrl, alt)
+	if jacobsmod and (scan == ui.SDL_SCANCODE_O) and not rep then jacobsmod_old_menu_check = true end
+	if scan == ui.SDL_SCANCODE_ESCAPE and not MANAGER.hidden then MANAGER.hidden=true return false end
 	if MANAGER.hidden then return end
 
-	if event == 1 then
-		if key == "[" then
-			mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, 1)
-		elseif key == "]" then
-			mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, -1)
-		end
+	if scan == ui.SDL_SCANCODE_LEFTBRACKET or scan == ui.SDL_SCANCODE_UP then
+		mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, 5)
+	elseif scan == ui.SDL_SCANCODE_RIGHTBRACKET or scan == ui.SDL_SCANCODE_DOWN then
+		mainwindow:process(mainwindow.x+30, mainwindow.y+30, 0, 2, -5)
 	end
+
 	return false
 end
 --small button on right to bring up main menu
@@ -1437,4 +1436,4 @@ if started~="" then
 	MANAGER.print("Auto started"..started)
 end
 tpt.register_mouseevent(mouseclick)
-tpt.register_keypress(keypress)
+evt.register(evt.keypress, keypress)
