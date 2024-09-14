@@ -418,6 +418,8 @@ new = function(x,y,h,t,m)
 	bar.pos=0
 	bar.length=math.floor((1/math.ceil(bar.total-bar.numshown+1))*bar.h)
 	bar.soffset=math.floor(bar.pos*((bar.h-bar.length)/(bar.total-bar.numshown)))
+	bar.isClicked = false
+	bar.lastY = 0
 	function bar:update(total,shown,pos)
 		self.pos=pos or 0
 		if self.pos<0 then self.pos=0 end
@@ -442,16 +444,44 @@ new = function(x,y,h,t,m)
 		if y then self.y=self.y+y end
 	end)
 	function bar:process(mx,my,button,event,wheel)
-		if wheel~=0 and not MANAGER.hidden then
-			if self.total > self.numshown then
-				local previous = self.pos
-				self:move(wheel)
-				if self.pos~=previous then
-					return previous-self.pos
+		if self.total <= self.numshown then
+			return false
+		end
+		-- mousedown
+		if event == 1 then
+			if button == 1 then
+				self.isClicked = true
+				self.lastY = my
+			end
+		-- mouseup
+		elseif event == 2 then
+			self.isClicked = false
+		-- mousemove (scroll items if we're dragging)
+		elseif event == 3 then
+			if self.isClicked then
+				local diff = my - self.lastY
+				-- 8 is hardcoded height of each item so it works ...
+				if math.abs(diff) > 8 then
+					local previous = self.pos
+					if diff > 0 then
+						self:move(1)
+					else
+						self:move(-1)
+					end
+					self.lastY = my
+					return previous - self.pos
 				end
 			end
 		end
-		--possibly click the bar and drag?
+
+		-- mousewheel (scroll items)
+		if wheel~=0 and not MANAGER.hidden then
+			local previous = self.pos
+			self:move(wheel)
+			if self.pos~=previous then
+				return previous-self.pos
+			end
+		end
 		return false
 	end
 	return bar
@@ -490,7 +520,7 @@ new = function(x,y,w,h,f,text)
 	function b:process(mx,my,button,event,wheel)
 		local clicked = self.clicked
 		if event==2 then self.clicked = false end
-		if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then return false end
+		if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then self.clicked = false return false end
 		if event==1 then
 			self.clicked=true
 		elseif clicked then
@@ -653,6 +683,7 @@ new_button = function(x,y,w,h,splitx,f,f2,text,localscript)
 			end
 		else
 			if self.checkbut.canupdate then self.checkbut:process(mx,my,button,event,wheel) end
+			self.clicked = 0
 		end
 		return true
 	end
@@ -717,6 +748,7 @@ new = function(x,y,w,h)
 		if move==0 then return end
 		for i,check in ipairs(self.list) do
 			check:onmove(0,move)
+			check.clicked = 0
 		end
 	end
 	function box:process(mx,my,button,event,wheel)
@@ -805,7 +837,7 @@ new = function(x,y,w,h)
 		end
 	end)
 	function w:process(mx,my,button,event,wheel)
-		if mx<self.x or mx>self.x2 or my<self.y or my>self.y2 then if button == 0 then return end ui_button.sidepressed() return true end
+		if (mx<self.x or mx>self.x2 or my<self.y or my>self.y2) and event == 1 then ui_button.sidepressed() return true end
 		local ret
 		for i,sub in ipairs(self.sub) do
 			if sub:process(mx,my,button,event,wheel) then ret = true end
