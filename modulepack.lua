@@ -84,24 +84,27 @@ _G.require = (function()
 	else
 		chunkname = nil
 	end
+	local function escape_regex(str)
+		return (str:gsub("[%$%%%(%)%*%+%-%.%?%]%[%^]", "%%%1"))
+	end
+	local function demangle(str)
+		if chunkname then
+			return str:gsub(escape_regex(chunkname) .. ":(%d+)", function(line)
+				line = tonumber(line)
+				for i = #lineinfo, 1, -1 do
+					if lineinfo[i].line <= line then
+						return ("%s$%s:%i"):format(chunkname, lineinfo[i].mod_name, line - lineinfo[i].line + 1)
+					end
+				end
+			end)
+		end
+		return str
+	end
+	local function traceback(...)
+		return demangle(debug.traceback(...))
+	end
 	local function xpcall_wrap(func, handler)
 		return function(...)
-			local function escape_regex(str)
-				return (str:gsub("[%$%%%(%)%*%+%-%.%?%]%[%^]", "%%%1"))
-			end
-			local function demangle(str)
-				if chunkname then
-					return str:gsub(escape_regex(chunkname) .. ":(%d+):", function(line)
-						line = tonumber(line)
-						for i = #lineinfo, 1, -1 do
-							if lineinfo[i].line <= line then
-								return ("%s$%s:%i:"):format(chunkname, lineinfo[i].mod_name, line - lineinfo[i].line + 1)
-							end
-						end
-					end)
-				end
-				return str
-			end
 			local iargs = packn(...)
 			local oargs
 			xpcall(function()
@@ -114,7 +117,7 @@ _G.require = (function()
 					handler(err)
 				end
 				if type(err) == "string" then
-					print(demangle(debug.traceback(err, 2)))
+					print(traceback(err, 2))
 				end
 				return err
 			end)
@@ -134,6 +137,7 @@ _G.require = (function()
 		packn       = packn,
 		unpackn     = unpackn,
 		xpcall_wrap = xpcall_wrap,
+		traceback   = traceback,
 	}
 	mod_state["modulepack"] = "loaded"
 
