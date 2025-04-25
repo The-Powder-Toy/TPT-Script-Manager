@@ -146,6 +146,7 @@ _G.require = (function()
 		packn       = packn,
 		unpackn     = unpackn,
 		xpcall_wrap = xpcall_wrap,
+		demangle    = demangle,
 		traceback   = traceback,
 	}
 	mod_state["modulepack"] = "loaded"
