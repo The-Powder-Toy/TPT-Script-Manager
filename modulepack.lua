@@ -1,18 +1,8 @@
-local conf, verb = ...
-local conf_file = assert(io.open(conf, "rb"))
-local base_path = conf:match("^(.+[\\/])[^\\/]+$") or ""
+local conf_list, verb = ...
 local parts = {}
 local seen = {}
-local mod_names = {}
+local modinfo = {}
 local lineinfo = {}
-for mod_name in conf_file:lines() do
-	if seen[mod_name] then
-		error("duplicate module " .. mod_name)
-	end
-	seen[mod_name] = true
-	table.insert(mod_names, mod_name)
-end
-conf_file:close()
 local function count_lines(str)
 	local count = 0
 	for _ in str:gmatch("\n") do
@@ -20,15 +10,34 @@ local function count_lines(str)
 	end
 	return count
 end
-local first_mod_name = mod_names[1]
+for conf in conf_list:gmatch("[^:]+") do
+	if conf ~= "" then
+		local conf_file = assert(io.open(conf, "rb"))
+		local base_path = conf:match("^(.+[\\/])[^\\/]+$") or ""
+		for mod_name in conf_file:lines() do
+			if seen[mod_name] then
+				error("duplicate module " .. mod_name)
+			end
+			seen[mod_name] = true
+			table.insert(modinfo, {
+				base_path = base_path,
+				mod_name  = mod_name,
+			})
+		end
+		conf_file:close()
+	end
+end
+local first_mod_name = modinfo[1].mod_name
 local last_line = 2
-table.sort(mod_names)
-for _, mod_name in ipairs(mod_names) do
+table.sort(modinfo, function(lhs, rhs)
+	return lhs.mod_name < rhs.mod_name
+end)
+for _, info in ipairs(modinfo) do
 	local firsterr
 	local mod_file
 	for _, path_to_try in ipairs({
-		base_path .. mod_name:gsub("%.", "/") .. ".lua",
-		base_path .. mod_name:gsub("%.", "/") .. "/init.lua",
+		info.base_path .. info.mod_name:gsub("%.", "/") .. ".lua",
+		info.base_path .. info.mod_name:gsub("%.", "/") .. "/init.lua",
 	}) do
 		local err
 		mod_file, err = io.open(path_to_try, "rb")
@@ -44,10 +53,10 @@ for _, mod_name in ipairs(mod_names) do
 		error(firsterr)
 	end
 	local mod_content = assert(mod_file:read("*a"))
-	table.insert(lineinfo, { line = last_line, mod_name = mod_name })
+	table.insert(lineinfo, { line = last_line, mod_name = info.mod_name })
 	last_line = last_line + count_lines(mod_content) + 4
 	mod_file:close()
-	table.insert(parts, [[require("register", "]] .. mod_name .. [[", function()
+	table.insert(parts, [[require("register", "]] .. info.mod_name .. [[", function()
 ]])
 	table.insert(parts, mod_content)
 	table.insert(parts, [[
