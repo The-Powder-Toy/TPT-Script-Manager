@@ -155,7 +155,9 @@ _G.require = (function()
 			if verb == "run" then
 				finalized = true
 				_G.require = real_require
-				return xpcall_wrap(temp_require(reg_mod_name).run)()
+				return xpcall_wrap(function()
+					temp_require(reg_mod_name).run()
+				end)()
 			elseif verb == "getenv" then
 				local env = setmetatable({}, { __index = function(_, key)
 					error("__index on env: " .. tostring(key), 2)
@@ -176,11 +178,24 @@ _G.require = (function()
 		end
 		local mod_name = verb
 		if mod_state[mod_name] ~= "loaded" then
+			local func = mod_func[mod_name]
+			if not func then
+				error("module " .. mod_name .. " not found", 2)
+			end
 			if mod_state[mod_name] == "loading" then
 				error("circular dependency", 2)
 			end
 			mod_state[mod_name] = "loading"
-			mod_result[mod_name] = xpcall_wrap(mod_func[mod_name])()
+			local ok = true
+			local err
+			mod_result[mod_name] = xpcall_wrap(func, function(xperr)
+				ok = false
+				err = xperr
+			end)()
+			if not ok then
+				mod_state[mod_name] = "failed"
+				error(xperr, 2)
+			end
 			mod_state[mod_name] = "loaded"
 		end
 		return mod_result[mod_name]
