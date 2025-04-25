@@ -130,6 +130,13 @@ _G.require = (function()
 	local mod_result = {}
 	local finalized = false
 
+	mod_result["modulepack"] = {
+		packn       = packn,
+		unpackn     = unpackn,
+		xpcall_wrap = xpcall_wrap,
+	}
+	mod_state["modulepack"] = "loaded"
+
 	local function temp_require(verb, reg_mod_name, reg_func)
 		if not finalized then
 			if verb == "run" then
@@ -146,7 +153,6 @@ _G.require = (function()
 					rawset(env, key, value)
 				end
 				rawset(env, "require", temp_require)
-				rawset(env, "xpcall_wrap", xpcall_wrap)
 				return env
 			elseif verb == "register" then
 				mod_func[reg_mod_name] = reg_func
