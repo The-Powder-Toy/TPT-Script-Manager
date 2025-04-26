@@ -66,7 +66,7 @@ end)
 ]])
 end
 assert(first_mod_name, "no modules specified")
-table.insert(parts, [[return require("run", "]] .. first_mod_name .. [[")
+table.insert(parts, [[return require("run", "]] .. first_mod_name .. [[", ...)
 ]])
 local function head()
 	local lineinfo_strs = {}
@@ -151,14 +151,21 @@ _G.require = (function()
 	}
 	mod_state["modulepack"] = "loaded"
 
-	local function temp_require(verb, reg_mod_name, reg_func)
+	local function temp_require(verb, reg_mod_name, ...)
 		if not finalized then
 			if verb == "run" then
 				finalized = true
 				_G.require = real_require
-				return xpcall_wrap(function()
-					temp_require(reg_mod_name).run()
-				end)()
+				local ok = true
+				local ret = packn(xpcall_wrap(function(...)
+					temp_require(reg_mod_name).run(...)
+				end, function()
+					ok = false
+				end)(...))
+				if not ok then
+					error("entry point failed")
+				end
+				return unpackn(ret)
 			elseif verb == "getenv" then
 				local env = setmetatable({}, { __index = function(_, key)
 					error("__index on env: " .. tostring(key), 2)
@@ -171,7 +178,7 @@ _G.require = (function()
 				rawset(env, "require", temp_require)
 				return env
 			elseif verb == "register" then
-				mod_func[reg_mod_name] = reg_func
+				mod_func[reg_mod_name] = ...
 			else
 				error("bad verb")
 			end
@@ -188,14 +195,12 @@ _G.require = (function()
 			end
 			mod_state[mod_name] = "loading"
 			local ok = true
-			local err
-			mod_result[mod_name] = xpcall_wrap(func, function(xperr)
+			mod_result[mod_name] = xpcall_wrap(func, function()
 				ok = false
-				err = xperr
 			end)()
 			if not ok then
 				mod_state[mod_name] = "failed"
-				error(xperr, 2)
+				error("module failed")
 			end
 			mod_state[mod_name] = "loaded"
 		end
