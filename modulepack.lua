@@ -16,7 +16,7 @@ for conf in conf_list:gmatch("[^:]+") do
 		local base_path = conf:match("^(.+[\\/])[^\\/]+$") or ""
 		for mod_name in conf_file:lines() do
 			if seen[mod_name] then
-				error("duplicate module " .. mod_name)
+				error(("duplicate module %q"):format(mod_name), 0)
 			end
 			seen[mod_name] = true
 			table.insert(modinfo, {
@@ -35,9 +35,10 @@ end)
 for _, info in ipairs(modinfo) do
 	local firsterr
 	local mod_file
+	local as_path = info.mod_name:gsub("%.", "/")
 	for _, path_to_try in ipairs({
-		info.base_path .. info.mod_name:gsub("%.", "/") .. ".lua",
-		info.base_path .. info.mod_name:gsub("%.", "/") .. "/init.lua",
+		("%s%s.lua"     ):format(info.base_path, as_path),
+		("%s%s/init.lua"):format(info.base_path, as_path),
 	}) do
 		local err
 		mod_file, err = io.open(path_to_try, "rb")
@@ -50,14 +51,14 @@ for _, info in ipairs(modinfo) do
 		end
 	end
 	if not mod_file then
-		error(firsterr)
+		error(firsterr, 0)
 	end
 	local mod_content = assert(mod_file:read("*a"))
 	table.insert(lineinfo, { line = last_line, mod_name = info.mod_name })
 	last_line = last_line + count_lines(mod_content) + 4
 	mod_file:close()
-	table.insert(parts, [[require("register", "]] .. info.mod_name .. [[", function()
-]])
+	table.insert(parts, ([[require("register", %q, function()
+]]):format(info.mod_name))
 	table.insert(parts, mod_content)
 	table.insert(parts, [[
 
@@ -66,12 +67,12 @@ end)
 ]])
 end
 assert(first_mod_name, "no modules specified")
-table.insert(parts, [[return require("run", "]] .. first_mod_name .. [[", ...)
-]])
+table.insert(parts, ([[return require("run", %q, ...)
+]]):format(first_mod_name))
 local function head()
 	local lineinfo_strs = {}
 	for _, info in ipairs(lineinfo) do
-		table.insert(lineinfo_strs, ([[{ line = %i, mod_name = "%s" }]]):format(info.line, info.mod_name))
+		table.insert(lineinfo_strs, ([[{ line = %i, mod_name = %q }]]):format(info.line, info.mod_name))
 	end
 	return [[
 _G.require = (function()
@@ -98,14 +99,14 @@ _G.require = (function()
 	end
 	local function demangle(str)
 		if chunkname then
-			return str:gsub(escape_regex(chunkname) .. ":(%d+)", function(line)
+			return (str:gsub(escape_regex(chunkname) .. ":(%d+)", function(line)
 				line = tonumber(line)
 				for i = #lineinfo, 1, -1 do
 					if lineinfo[i].line <= line then
 						return ("%s$%s:%i"):format(chunkname, lineinfo[i].mod_name, line - lineinfo[i].line + 1)
 					end
 				end
-			end)
+			end))
 		end
 		return str
 	end
@@ -163,14 +164,16 @@ _G.require = (function()
 					ok = false
 				end)(...))
 				if not ok then
-					error("entry point failed")
+					error("entry point failed", 2)
 				end
 				return unpackn(ret)
+			elseif verb == "getmodulepack" then
+				return mod_result["modulepack"]
 			elseif verb == "getenv" then
 				local env = setmetatable({}, { __index = function(_, key)
-					error("__index on env: " .. tostring(key), 2)
+					error(("__index on env: %s"):format(tostring(key)), 2)
 				end, __newindex = function(_, key)
-					error("__newindex on env: " .. tostring(key), 2)
+					error(("__newindex on env: %s"):format(tostring(key)), 2)
 				end })
 				for key, value in pairs(_G) do
 					rawset(env, key, value)
@@ -180,7 +183,7 @@ _G.require = (function()
 			elseif verb == "register" then
 				mod_func[reg_mod_name] = ...
 			else
-				error("bad verb")
+				error("bad verb", 2)
 			end
 			return
 		end
@@ -188,7 +191,7 @@ _G.require = (function()
 		if mod_state[mod_name] ~= "loaded" then
 			local func = mod_func[mod_name]
 			if not func then
-				error("module " .. mod_name .. " not found", 2)
+				error(("module %q not found"):format(mod_name), 2)
 			end
 			if mod_state[mod_name] == "loading" then
 				error("circular dependency", 2)
@@ -200,7 +203,7 @@ _G.require = (function()
 			end)()
 			if not ok then
 				mod_state[mod_name] = "failed"
-				error("module failed")
+				error("module failed", 2)
 			end
 			mod_state[mod_name] = "loaded"
 		end
@@ -224,8 +227,18 @@ for _, info in ipairs(lineinfo) do
 end
 parts[1] = head()
 local script = table.concat(parts)
-if verb == "run" then
-	local func = assert(load(script, "=modulepack-" .. first_mod_name, "t"))
-	return func(select(3, ...))
+do
+	local chunkname = "=modulepack-" .. first_mod_name
+	local func, err = load(script, chunkname, "t")
+	if not func then
+		local demangle = assert(load(head() .. [[
+
+return require("getmodulepack").demangle
+]], chunkname, "t"))()
+		error("load-time error: " .. tostring(demangle(err)), 0)
+	end
+	if verb == "run" then
+		return func(select(3, ...))
+	end
 end
 io.stdout:write(script)
