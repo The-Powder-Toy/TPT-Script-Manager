@@ -28,10 +28,18 @@ for conf in conf_list:gmatch("[^:]+") do
 	end
 end
 local first_mod_name = modinfo[1].mod_name
-local last_line = 2
 table.sort(modinfo, function(lhs, rhs)
 	return lhs.mod_name < rhs.mod_name
 end)
+table.insert(parts, [[
+if rawget(_G, "setfenv") then
+	setfenv(1, { _G = _G, modules = {} })
+else
+	_ENV = { _G = _G, modules = {} }
+end
+
+]])
+local last_line = count_lines(parts[1]) + 2
 for _, info in ipairs(modinfo) do
 	local firsterr
 	local mod_file
@@ -54,32 +62,42 @@ for _, info in ipairs(modinfo) do
 		error(firsterr, 0)
 	end
 	local mod_content = assert(mod_file:read("*a"))
-	table.insert(lineinfo, { line = last_line, mod_name = info.mod_name })
-	last_line = last_line + count_lines(mod_content) + 4
+	local mod_lines = count_lines(mod_content)
+	table.insert(lineinfo, { mod_name = info.mod_name, line = last_line, mod_lines = mod_lines })
+	last_line = last_line + mod_lines + 4
 	mod_file:close()
-	table.insert(parts, ([[require("register", %q, function()
+	table.insert(parts, ([[modules[%q] = function()
 ]]):format(info.mod_name))
 	table.insert(parts, mod_content)
 	table.insert(parts, [[
 
-end)
+end
 
 ]])
 end
+table.sort(lineinfo, function(lhs, rhs)
+	return lhs.line > rhs.line
+end)
+local lineinfo_strs = {}
+for _, info in ipairs(lineinfo) do
+	table.insert(lineinfo_strs, ("{ mod_name = %q, line = %i, mod_lines = %i }"):format(info.mod_name, info.line, info.mod_lines))
+end
 assert(first_mod_name, "no modules specified")
-table.insert(parts, ([[return require("run", %q, ...)
-]]):format(first_mod_name))
-local function head()
-	local lineinfo_strs = {}
-	for _, info in ipairs(lineinfo) do
-		table.insert(lineinfo_strs, ([[{ line = %i, mod_name = %q }]]):format(info.line, info.mod_name))
-	end
-	return [[
-_G.require = (function()
-	local lineinfo = {
-]] .. table.concat(lineinfo_strs, ",\n") .. [[
+table.insert(parts, [[
 
-	}
+return (function(...)
+	local first_mod_name = ]] .. ("%q"):format(first_mod_name) .. [[
+	local senv
+	local _ENV = _ENV
+	if _G.rawget(_G, "setfenv") then
+		senv = _G.getfenv(1)
+		_G.setfenv(1, _G)
+	else
+		senv = _ENV
+		_ENV = _G
+	end
+	local modules = senv.modules
+	senv.modules = nil
 
 	local unpack = rawget(_G, "unpack") or table.unpack
 	local function packn(...)
@@ -94,6 +112,12 @@ _G.require = (function()
 	else
 		chunkname = nil
 	end
+]])
+local demangle = [[
+	local lineinfo = {
+		]] .. table.concat(lineinfo_strs, ",\n\t\t") .. [[
+
+	}
 	local function escape_regex(str)
 		return (str:gsub("[%$%%%(%)%*%+%-%.%?%]%[%^]", "%%%1"))
 	end
@@ -101,15 +125,21 @@ _G.require = (function()
 		if chunkname then
 			return (str:gsub(escape_regex(chunkname) .. ":(%d+)", function(line)
 				line = tonumber(line)
-				for i = #lineinfo, 1, -1 do
-					if lineinfo[i].line <= line then
-						return ("%s$%s:%i"):format(chunkname, lineinfo[i].mod_name, line - lineinfo[i].line + 1)
+				for _, info in ipairs(lineinfo) do
+					if info.line <= line then
+						local mod_line = line - info.line + 1
+						if mod_line <= info.mod_lines then
+							return ("%s$%s:%i"):format(chunkname, info.mod_name, mod_line)
+						end
 					end
 				end
 			end))
 		end
 		return str
 	end
+]]
+table.insert(parts, demangle)
+table.insert(parts, [[
 	local function traceback(...)
 		return demangle(debug.traceback(...))
 	end
@@ -137,59 +167,11 @@ _G.require = (function()
 		end
 	end
 
-	local real_require = _G.require
-	local mod_func = {}
 	local mod_state = {}
 	local mod_result = {}
-	local finalized = false
-
-	mod_result["modulepack"] = {
-		packn       = packn,
-		unpackn     = unpackn,
-		xpcall_wrap = xpcall_wrap,
-		demangle    = demangle,
-		traceback   = traceback,
-	}
-	mod_state["modulepack"] = "loaded"
-
-	local function temp_require(verb, reg_mod_name, ...)
-		if not finalized then
-			if verb == "run" then
-				finalized = true
-				_G.require = real_require
-				local ok = true
-				local ret = packn(xpcall_wrap(function(...)
-					temp_require(reg_mod_name).run(...)
-				end, function()
-					ok = false
-				end)(...))
-				if not ok then
-					error("entry point failed", 2)
-				end
-				return unpackn(ret)
-			elseif verb == "getmodulepack" then
-				return mod_result["modulepack"]
-			elseif verb == "getenv" then
-				local env = setmetatable({}, { __index = function(_, key)
-					error(("__index on env: %s"):format(tostring(key)), 2)
-				end, __newindex = function(_, key)
-					error(("__newindex on env: %s"):format(tostring(key)), 2)
-				end })
-				for key, value in pairs(_G) do
-					rawset(env, key, value)
-				end
-				rawset(env, "require", temp_require)
-				return env
-			elseif verb == "register" then
-				mod_func[reg_mod_name] = ...
-			else
-				error("bad verb", 2)
-			end
-			return
-		end
-		local mod_name = verb
+	local function modulepack_require(mod_name)
 		if mod_state[mod_name] ~= "loaded" then
-			local func = mod_func[mod_name]
+			local func = modules[mod_name]
 			if not func then
 				error(("module %q not found"):format(mod_name), 2)
 			end
@@ -209,33 +191,53 @@ _G.require = (function()
 		end
 		return mod_result[mod_name]
 	end
-	return temp_require
-end)()
 
-if rawget(_G, "setfenv") then
-	setfenv(1, require("getenv"))
-else
-	_ENV = require("getenv")
-end
+	for key, value in pairs(_G) do
+		rawset(senv, key, value)
+	end
+	rawset(senv, "require", modulepack_require)
+	setmetatable(senv, { __index = function(_, key)
+		error(("__index on env: %s"):format(tostring(key)), 2)
+	end, __newindex = function(_, key)
+		error(("__newindex on env: %s"):format(tostring(key)), 2)
+	end })
 
-]]
-end
-table.insert(parts, 1, head())
-local head_lines = count_lines(parts[1])
-for _, info in ipairs(lineinfo) do
-	info.line = info.line + head_lines
-end
-parts[1] = head()
+	mod_result["modulepack"] = {
+		packn       = packn,
+		unpackn     = unpackn,
+		xpcall_wrap = xpcall_wrap,
+		demangle    = demangle,
+		traceback   = traceback,
+	}
+	mod_state["modulepack"] = "loaded"
+
+	local ok = true
+	local ret = packn(xpcall_wrap(function(...)
+		modulepack_require(first_mod_name).run(...)
+	end, function()
+		ok = false
+	end)(...))
+	if not ok then
+		error("entry point failed", 2)
+	end
+	return unpackn(ret)
+end)(...)
+]])
 local script = table.concat(parts)
 do
-	local chunkname = "=modulepack-" .. first_mod_name
-	local func, err = load(script, chunkname, "t")
+	local chunkname = "modulepack-" .. first_mod_name
+	local func, err = load(script, "=" .. chunkname, "t")
 	if not func then
-		local demangle = assert(load(head() .. [[
+		local demangle = assert(load([[
+			local chunkname = ]] .. ("%q"):format(chunkname) .. [[
+]] .. demangle .. [[
 
-return require("getmodulepack").demangle
-]], chunkname, "t"))()
+return demangle
+]], "=demangle", "t"))()
 		error("load-time error: " .. tostring(demangle(err)), 0)
+	end
+	if verb == "getfunc" then
+		return func
 	end
 	if verb == "run" then
 		return func(select(3, ...))
