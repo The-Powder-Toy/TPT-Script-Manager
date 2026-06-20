@@ -1,6 +1,6 @@
 --Cracker64's Autorun Script Manager
 --The autorun to end all autoruns
---Version 3.16
+--Version 3.17
 
 --TODO:
 --manual file addition (that can be anywhere and any extension)
@@ -9,6 +9,7 @@
 --prettier, organize code
 
 --CHANGES:
+--Version 3.17: Fix script manager being unclickable if scripts failed to load due to lag
 --Version 3.16: Fix Online FILTER breaking on a certain script, Fix 408 errors when downloading scripts on slow connections, Fix rare corruption of script settings or scripts list
 --Version 3.15: Bracket keys now scroll 5x faster, fix bracket scrolling being impossible on some keyboard layouts. Add ability to scroll by clicking and dragging, or with up/down arrow keys
 --Version 3.14: Fix extra newlines being inserted into scripts on Windows
@@ -57,8 +58,8 @@ end
 if not socket then error("TPT version not supported") end
 if MANAGER then error("manager is already running") end
 
-local scriptversion = 18
-MANAGER = {["version"] = "3.16", ["scriptversion"] = scriptversion, ["hidden"] = true}
+local scriptversion = 19
+MANAGER = {["version"] = "3.17", ["scriptversion"] = scriptversion, ["hidden"] = true}
 
 local type = type -- people like to overwrite this function with a global a lot
 local TPT_LUA_PATH = 'scripts'
@@ -1370,7 +1371,7 @@ local function gen_buttons_online()
 	end
 
 	online_req = http.get("https://starcatcher.us/scripts/main.lua")
-	
+
 	if first_online then
 		first_online = false
 		script_manager_update_req = http.get("https://starcatcher.us/scripts/main.lua?info=1")
@@ -1393,7 +1394,7 @@ local function check_online_req_status()
 			MANAGER.print("script list download failed with status code " .. status_code, 255, 0, 0)
 			return
 		end
-		
+
 		if not online then return end
 
 		onlinescripts = readScriptInfo(list)
@@ -1431,7 +1432,7 @@ local function check_update_req_status()
 			MANAGER.print("self update check failed with status code " .. status_code, 255, 0, 0)
 			return
 		end
-		
+
 		updatetable = readScriptInfo(updateinfo)
 		if not updatetable[1] then return end
 		if tonumber(updatetable[1].version) > scriptversion then
@@ -1465,6 +1466,9 @@ gen_buttons()
 
 --register manager first
 tpt.register_step(smallstep)
+tpt.register_mouseevent(mouseclick)
+evt.register(evt.keypress, keypress)
+
 --load previously running scripts
 local started = ""
 for prev,v in pairs(running) do
@@ -1482,5 +1486,3 @@ save_last()
 if started~="" then
 	MANAGER.print("Auto started"..started)
 end
-tpt.register_mouseevent(mouseclick)
-evt.register(evt.keypress, keypress)
